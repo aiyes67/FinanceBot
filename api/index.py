@@ -1122,39 +1122,58 @@ def process_update(update):
 
 
 # ============================================================
-# VERCEL HANDLER
+# VERCEL HANDLER (функция, а не класс)
 # ============================================================
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        if WEBHOOK_SECRET and self.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
-            self.send_response(403)
-            self.end_headers()
-            return
+def _read_body(req):
+    try:
+        length = int(req.headers.get("content-length", 0) or 0)
+        if length <= 0:
+            return b""
+        return req.rfile.read(length)
+    except Exception:
+        return b""
 
-        update = {}
-        try:
-            length = int(self.headers.get("content-length", 0))
-            update = json.loads(self.rfile.read(length).decode("utf-8"))
-            process_update(update)
-        except Exception as e:
-            print("Error:", repr(e))
+
+def _json_response(obj, status=200):
+    return status, {"Content-Type": "application/json"}, json.dumps(obj).encode("utf-8")
+
+
+def _text_response(text, status=200):
+    return status, {"Content-Type": "text/plain; charset=utf-8"}, text.encode("utf-8")
+
+
+def handler(req):
+    """Точка входа для Vercel Python runtime: handler(request) -> (status, headers, body)."""
+    try:
+        method = req.method
+        headers = req.headers
+
+        # --- POST: Telegram webhook ---
+        if method == "POST":
+            if WEBHOOK_SECRET and headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
+                return _json_response({"ok": False, "error": "forbidden"}, 403)
+
+            update = {}
             try:
-                src = update.get("message") or update.get("callback_query") or {}
-                chat_id = (src.get("chat") or {}).get("id")
-                user_id = (src.get("from") or {}).get("id")
-                if chat_id and user_id:
-                    l, _ = get_user(user_id)
-                    send_message(chat_id, T[l if l in LANGS else "ru"]["error"])
-            except Exception as e2:
-                print("Error handler failed:", repr(e2))
+                raw = _read_body(req)
+                update = json.loads(raw.decode("utf-8")) if raw else {}
+                process_update(update)
+            except Exception as e:
+                print("Error:", repr(e))
+                try:
+                    src = update.get("message") or update.get("callback_query") or {}
+                    chat_id = (src.get("chat") or {}).get("id")
+                    user_id = (src.get("from") or {}).get("id")
+                    if chat_id and user_id:
+                        l, _ = get_user(user_id)
+                        send_message(chat_id, T[l if l in LANGS else "ru"]["error"])
+                except Exception as e2:
+                    print("Error handler failed:", repr(e2))
 
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(b'{"ok": true}')
+            return _json_response({"ok": True})
 
-    def do_GET(self):
+        # --- GET: диагностика ---
         lines = ["Bot is alive!"]
         missing = [n for n in ("TELEGRAM_TOKEN", "DATABASE_URL") if not os.environ.get(n)]
         if missing:
@@ -1162,9 +1181,11 @@ class handler(BaseHTTPRequestHandler):
         else:
             try:
                 with db() as cur:
-                    cur.execute("SELECT to_regclass('public.transactions') AS a, "
-                                "to_regclass('public.user_settings') AS b, "
-                                "to_regclass('public.user_state') AS c")
+                    cur.execute(
+                        "SELECT to_regclass('public.transactions') AS a, "
+                        "to_regclass('public.user_settings') AS b, "
+                        "to_regclass('public.user_state') AS c"
+                    )
                     row = cur.fetchone()
                 lines.append("Table transactions: " + ("OK" if row["a"] else "MISSING"))
                 lines.append("Table user_settings: " + ("OK" if row["b"] else "MISSING"))
@@ -1172,7 +1193,8 @@ class handler(BaseHTTPRequestHandler):
             except Exception as e:
                 lines.append("Database error: " + type(e).__name__ + " — " + str(e)[:200])
 
-        key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
+        path = getattr(req, "path", "/") or "/"
+        key = parse_qs(urlparse(path).query).get("key", [""])[0]
         if not missing and (not WEBHOOK_SECRET or key == WEBHOOK_SECRET):
             try:
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe"
@@ -1189,7 +1211,8 @@ class handler(BaseHTTPRequestHandler):
             except Exception as e:
                 lines.append("Telegram getWebhookInfo error: " + type(e).__name__)
 
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.end_headers()
-        self.wfile.write("\n".join(lines).encode("utf-8"))
+        return _text_response("\n".join(lines))
+
+    except Exception as e:
+        print("Top-level handler error:", repr(e))
+        return _json_response({"ok": False, "error": type(e).__name__}, 500)
