@@ -3,32 +3,31 @@ import re
 import json
 import urllib.request
 from contextlib import contextmanager
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 from zoneinfo import ZoneInfo
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from google import genai
-from google.genai import types
 
 # ============================================================
 # CONFIG
 # ============================================================
 
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-DATABASE_URL = os.environ["DATABASE_URL"]
-OWNER_ID = int(os.environ.get("OWNER_ID", "0"))            # 0 = бот для всех
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+try:
+    OWNER_ID = int(os.environ.get("OWNER_ID") or "0")      # 0 = бот для всех
+except ValueError:
+    OWNER_ID = 0
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")      # необязательно
-AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT", "10"))  # вопросов к ИИ на человека в сутки
 
-TZ = ZoneInfo("Asia/Almaty")
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
-MODEL = "gemini-2.5-flash"
+try:
+    TZ = ZoneInfo("Asia/Almaty")
+except Exception:
+    TZ = timezone(timedelta(hours=5))  # UTC+5, если в системе нет базы часовых поясов
 
 LANGS = {"ru": "Русский", "en": "English", "kk": "Қазақша"}
-LANG_NAMES_FOR_AI = {"ru": "Russian", "en": "English", "kk": "Kazakh"}
 
 # ============================================================
 # TRANSLATIONS
@@ -41,21 +40,18 @@ T = {
             "Нажми ➖ Расход или ➕ Доход, потом напиши сумму и описание, например: кофе 1500.\n"
             "Слова «вчера» и «позавчера» тоже понимаю.\n\n"
             "📊 Неделя / Месяц / Год — отчёты. Прошлые периоды: /lastweek /lastmonth /lastyear\n"
-            "❓ Вопрос — вопрос о финансах (бюджет, накопления, кредиты, инвестиции)\n"
             "🌐 Язык — сменить язык"
         ),
         "menu": {
             "add_expense": "➖ Расход", "add_income": "➕ Доход",
             "week": "📊 Неделя", "month": "📊 Месяц", "year": "📊 Год",
-            "ask": "❓ Вопрос", "lang": "🌐 Язык",
+            "lang": "🌐 Язык",
         },
         "prompt_add_expense": "Напиши сумму и описание расхода, например: кофе 1500",
         "prompt_add_income": "Напиши сумму и описание дохода, например: зарплата 400000",
-        "prompt_ask": "Напиши свой вопрос о финансах.",
         "no_amount": "Не вижу сумму. Напиши, например: кофе 1500",
         "saved": "✅ Записано:",
         "cat_prompt": "Категория (по желанию):",
-        "quota": "Лимит вопросов на сегодня ({n}) исчерпан. Попробуй завтра.",
         "denied": "Доступ закрыт.",
         "error": "Произошла ошибка при обработке.",
         "lang_prompt": "Выбери язык:",
@@ -77,21 +73,18 @@ T = {
             "Tap ➖ Expense or ➕ Income, then type the amount and a description, e.g.: coffee 1500.\n"
             "I also understand \"yesterday\".\n\n"
             "📊 Week / Month / Year — reports. Past periods: /lastweek /lastmonth /lastyear\n"
-            "❓ Question — ask about finances (budgeting, saving, loans, investing)\n"
             "🌐 Language — change language"
         ),
         "menu": {
             "add_expense": "➖ Expense", "add_income": "➕ Income",
             "week": "📊 Week", "month": "📊 Month", "year": "📊 Year",
-            "ask": "❓ Question", "lang": "🌐 Language",
+            "lang": "🌐 Language",
         },
         "prompt_add_expense": "Type the amount and a description of the expense, e.g.: coffee 1500",
         "prompt_add_income": "Type the amount and a description of the income, e.g.: salary 400000",
-        "prompt_ask": "Type your finance question.",
         "no_amount": "I can't see an amount. Try: coffee 1500",
         "saved": "✅ Saved:",
         "cat_prompt": "Category (optional):",
-        "quota": "Daily question limit ({n}) reached. Try again tomorrow.",
         "denied": "Access denied.",
         "error": "Something went wrong.",
         "lang_prompt": "Choose a language:",
@@ -113,21 +106,18 @@ T = {
             "➖ Шығыс немесе ➕ Кіріс батырмасын басып, соманы және сипаттаманы жаз, мысалы: кофе 1500.\n"
             "«Кеше» деген сөзді де түсінемін.\n\n"
             "📊 Апта / Ай / Жыл — есептер. Өткен кезеңдер: /lastweek /lastmonth /lastyear\n"
-            "❓ Сұрақ — қаржы туралы сұрақ (бюджет, жинақ, несие, инвестиция)\n"
             "🌐 Тіл — тілді ауыстыру"
         ),
         "menu": {
             "add_expense": "➖ Шығыс", "add_income": "➕ Кіріс",
             "week": "📊 Апта", "month": "📊 Ай", "year": "📊 Жыл",
-            "ask": "❓ Сұрақ", "lang": "🌐 Тіл",
+            "lang": "🌐 Тіл",
         },
         "prompt_add_expense": "Шығыстың сомасын және сипаттамасын жаз, мысалы: кофе 1500",
         "prompt_add_income": "Кірістің сомасын және сипаттамасын жаз, мысалы: жалақы 400000",
-        "prompt_ask": "Қаржы туралы сұрағыңды жаз.",
         "no_amount": "Соманы көрмедім. Мысалы: кофе 1500",
         "saved": "✅ Жазылды:",
         "cat_prompt": "Санат (қалауыңша):",
-        "quota": "Бүгінгі сұрақ лимиті ({n}) таусылды. Ертең қайталап көр.",
         "denied": "Қолжетімділік жабық.",
         "error": "Өңдеу кезінде қате шықты.",
         "lang_prompt": "Тілді таңда:",
@@ -145,13 +135,13 @@ T = {
     },
 }
 
-MENU_ORDER = [["add_expense", "add_income"], ["week", "month", "year"], ["ask", "lang"]]
+MENU_ORDER = [["add_expense", "add_income"], ["week", "month", "year"], ["lang"]]
 LABEL_TO_ACTION = {label: action for lang in T.values() for action, label in lang["menu"].items()}
 
 COMMANDS = {
     "/week": "week", "/month": "month", "/year": "year",
     "/lastweek": "lastweek", "/lastmonth": "lastmonth", "/lastyear": "lastyear",
-    "/expense": "add_expense", "/income": "add_income", "/ask": "ask", "/lang": "lang",
+    "/expense": "add_expense", "/income": "add_income", "/lang": "lang",
 }
 
 CATEGORY_KEYS = {
@@ -251,23 +241,6 @@ def set_state(user_id, state):
                 """,
                 (user_id, state),
             )
-
-
-def take_ai_quota(user_id):
-    """True, если человек ещё не выбрал дневной лимит вопросов к ИИ."""
-    if OWNER_ID and user_id == OWNER_ID:
-        return True
-    today = datetime.now(TZ).date()
-    with db() as cur:
-        cur.execute(
-            """
-            INSERT INTO ai_usage (user_id, day, cnt) VALUES (%s, %s, 1)
-            ON CONFLICT (user_id, day) DO UPDATE SET cnt = ai_usage.cnt + 1
-            RETURNING cnt;
-            """,
-            (user_id, today),
-        )
-        return cur.fetchone()["cnt"] <= AI_DAILY_LIMIT
 
 
 def add_transaction(user_id, tx_type, amount, description, tx_date):
@@ -423,42 +396,6 @@ def send_report(chat_id, user_id, lang, period, previous=False):
     send_message(chat_id, format_report(lang, period, previous, start, end, rep))
 
 # ============================================================
-# AI (только ответы на вопросы о финансах, по кнопке ❓)
-# ============================================================
-
-def answer_finance(user_id, question, lang):
-    start, end = period_range("month")
-    rep = get_report(user_id, start, end)
-    context = {
-        "currency": "KZT",
-        "this_month": {
-            "income": rep["income"],
-            "expense": rep["expense"],
-            "balance": rep["balance"],
-            "top_expense_categories": [
-                {"category": r["category"], "total": float(r["total"])} for r in rep["top"]
-            ],
-        },
-    }
-    system = f"""
-You are a finance assistant inside a Telegram bot. Answer ONLY finance-related questions:
-personal finance, budgeting, saving, debt, loans, banking, taxes (general principles), investing basics,
-currencies, economics. If the question is not about finance, politely say you only help with finance.
-Reply in {LANG_NAMES_FOR_AI[lang]}. Be concise (up to ~1200 characters), plain text, no Markdown.
-You may use the user's monthly stats below, but never invent any user numbers.
-Do not promise returns. For taxes, laws and rates that can change, tell the user to check official sources.
-When advising on investments, loans or taxes, add one short line that this is general information, not personal advice.
-Default currency is Kazakhstani tenge (₸).
-"""
-    prompt = f"User's monthly stats (from database): {json.dumps(context, ensure_ascii=False)}\n\nQuestion: {question}"
-    response = ai_client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(system_instruction=system),
-    )
-    return response.text.strip()
-
-# ============================================================
 # ACTIONS
 # ============================================================
 
@@ -469,9 +406,9 @@ def is_allowed(user_id):
 def run_action(action, chat_id, user_id, lang):
     t = T[lang]
 
-    if action in ("add_expense", "add_income", "ask"):
+    if action in ("add_expense", "add_income"):
         set_state(user_id, action)
-        send_message(chat_id, t["prompt_ask" if action == "ask" else f"prompt_{action}"])
+        send_message(chat_id, t[f"prompt_{action}"])
 
     elif action == "lang":
         set_state(user_id, None)
@@ -583,14 +520,6 @@ def process_message(message):
         send_message(chat_id, "\n".join(lines), reply_markup=category_keyboard(state, tx_id, lang))
         return
 
-    if state == "ask":
-        set_state(user_id, None)
-        if not take_ai_quota(user_id):
-            send_message(chat_id, t["quota"].format(n=AI_DAILY_LIMIT))
-            return
-        send_message(chat_id, answer_finance(user_id, text, lang))
-        return
-
     # 4. Обычное сообщение вне режима — молчим
     return
 
@@ -634,6 +563,19 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(b'{"ok": true}')
 
     def do_GET(self):
+        lines = ["Bot is alive!"]
+        missing = [n for n in ("TELEGRAM_TOKEN", "DATABASE_URL") if not os.environ.get(n)]
+        if missing:
+            lines.append("Missing env vars: " + ", ".join(missing))
+        else:
+            try:
+                with db() as cur:
+                    cur.execute("SELECT count(*) AS n FROM transactions")
+                    cur.fetchone()
+                lines.append("Database: OK")
+            except Exception as e:
+                lines.append("Database error: " + type(e).__name__)
         self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
-        self.wfile.write(b"Bot is alive!")
+        self.wfile.write("\n".join(lines).encode("utf-8"))
