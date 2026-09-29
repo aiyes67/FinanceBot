@@ -2,6 +2,8 @@ import os
 import re
 import json
 import urllib.request
+import urllib.error
+from urllib.parse import urlparse, parse_qs
 from contextlib import contextmanager
 from datetime import datetime, date, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
@@ -17,17 +19,17 @@ from psycopg2.extras import RealDictCursor
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 try:
-    OWNER_ID = int(os.environ.get("OWNER_ID") or "0")      # 0 = Ð±Ð¾Ñ‚ Ð´Ð»Ñ Ð²ÑÐµÑ…
+    OWNER_ID = int(os.environ.get("OWNER_ID") or "0")      # 0 = бот для всех
 except ValueError:
     OWNER_ID = 0
-WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")      # Ð½ÐµÐ¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")      # необязательно
 
 try:
     TZ = ZoneInfo("Asia/Almaty")
 except Exception:
-    TZ = timezone(timedelta(hours=5))  # UTC+5, ÐµÑÐ»Ð¸ Ð² ÑÐ¸ÑÑ‚ÐµÐ¼Ðµ Ð½ÐµÑ‚ Ð±Ð°Ð·Ñ‹ Ñ‡Ð°ÑÐ¾Ð²Ñ‹Ñ… Ð¿Ð¾ÑÑÐ¾Ð²
+    TZ = timezone(timedelta(hours=5))  # UTC+5, если в системе нет базы часовых поясов
 
-LANGS = {"ru": "Ð ÑƒÑÑÐºÐ¸Ð¹", "en": "English", "kk": "ÒšÐ°Ð·Ð°Ò›ÑˆÐ°"}
+LANGS = {"ru": "Русский", "en": "English", "kk": "Қазақша"}
 
 # ============================================================
 # TRANSLATIONS
@@ -36,54 +38,54 @@ LANGS = {"ru": "Ð ÑƒÑÑÐºÐ¸Ð¹", "en": "English", "kk": "ÒšÐ°Ð
 T = {
     "ru": {
         "help": (
-            "ðŸ’° Ð¤Ð¸Ð½Ð°Ð½ÑÐ¾Ð²Ñ‹Ð¹ Ð¿Ð¾Ð¼Ð¾Ñ‰Ð½Ð¸Ðº\n\n"
-            "ÐÐ°Ð¶Ð¼Ð¸ âž– Ð Ð°ÑÑ…Ð¾Ð´ Ð¸Ð»Ð¸ âž• Ð”Ð¾Ñ…Ð¾Ð´, Ð¿Ð¾Ñ‚Ð¾Ð¼ Ð½Ð°Ð¿Ð¸ÑˆÐ¸ ÑÑƒÐ¼Ð¼Ñƒ Ð¸ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ, Ð½Ð°Ð¿Ñ€Ð¸Ð¼ÐµÑ€: ÐºÐ¾Ñ„Ðµ 1500.\n"
-            "Ð¡Ð»Ð¾Ð²Ð° Â«Ð²Ñ‡ÐµÑ€Ð°Â» Ð¸ Â«Ð¿Ð¾Ð·Ð°Ð²Ñ‡ÐµÑ€Ð°Â» Ñ‚Ð¾Ð¶Ðµ Ð¿Ð¾Ð½Ð¸Ð¼Ð°ÑŽ.\n\n"
-            "ðŸ“Š ÐÐµÐ´ÐµÐ»Ñ / ÐœÐµÑÑÑ† / Ð“Ð¾Ð´ â€” Ð¾Ñ‚Ñ‡Ñ‘Ñ‚Ñ‹. ÐŸÑ€Ð¾ÑˆÐ»Ñ‹Ðµ Ð¿ÐµÑ€Ð¸Ð¾Ð´Ñ‹: /lastweek /lastmonth /lastyear\n"
-            "ðŸŒ Ð¯Ð·Ñ‹Ðº â€” ÑÐ¼ÐµÐ½Ð¸Ñ‚ÑŒ ÑÐ·Ñ‹Ðº"
+            "💰 Финансовый помощник\n\n"
+            "Нажми ➖ Расход или ➕ Доход, потом напиши сумму и описание, например: кофе 1500.\n"
+            "Слова «вчера» и «позавчера» тоже понимаю.\n\n"
+            "📊 Неделя / Месяц / Год — отчёты. Прошлые периоды: /lastweek /lastmonth /lastyear\n"
+            "🌐 Язык — сменить язык"
         ),
         "menu": {
-            "add_expense": "âž– Ð Ð°ÑÑ…Ð¾Ð´", "add_income": "âž• Ð”Ð¾Ñ…Ð¾Ð´",
-            "week": "ðŸ“Š ÐÐµÐ´ÐµÐ»Ñ", "month": "ðŸ“Š ÐœÐµÑÑÑ†", "year": "ðŸ“Š Ð“Ð¾Ð´",
-            "lang": "ðŸŒ Ð¯Ð·Ñ‹Ðº",
+            "add_expense": "➖ Расход", "add_income": "➕ Доход",
+            "week": "📊 Неделя", "month": "📊 Месяц", "year": "📊 Год",
+            "lang": "🌐 Язык",
         },
-        "prompt_add_expense": "ÐÐ°Ð¿Ð¸ÑˆÐ¸ ÑÑƒÐ¼Ð¼Ñƒ Ð¸ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ Ñ€Ð°ÑÑ…Ð¾Ð´Ð°, Ð½Ð°Ð¿Ñ€Ð¸Ð¼ÐµÑ€: ÐºÐ¾Ñ„Ðµ 1500",
-        "prompt_add_income": "ÐÐ°Ð¿Ð¸ÑˆÐ¸ ÑÑƒÐ¼Ð¼Ñƒ Ð¸ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ Ð´Ð¾Ñ…Ð¾Ð´Ð°, Ð½Ð°Ð¿Ñ€Ð¸Ð¼ÐµÑ€: Ð·Ð°Ñ€Ð¿Ð»Ð°Ñ‚Ð° 400000",
-        "no_amount": "ÐÐµ Ð²Ð¸Ð¶Ñƒ ÑÑƒÐ¼Ð¼Ñƒ. ÐÐ°Ð¿Ð¸ÑˆÐ¸, Ð½Ð°Ð¿Ñ€Ð¸Ð¼ÐµÑ€: ÐºÐ¾Ñ„Ðµ 1500",
-        "saved": "âœ… Ð—Ð°Ð¿Ð¸ÑÐ°Ð½Ð¾:",
-        "cat_prompt": "ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ñ (Ð¿Ð¾ Ð¶ÐµÐ»Ð°Ð½Ð¸ÑŽ):",
-        "denied": "Ð”Ð¾ÑÑ‚ÑƒÐ¿ Ð·Ð°ÐºÑ€Ñ‹Ñ‚.",
-        "error": "ÐŸÑ€Ð¾Ð¸Ð·Ð¾ÑˆÐ»Ð° Ð¾ÑˆÐ¸Ð±ÐºÐ° Ð¿Ñ€Ð¸ Ð¾Ð±Ñ€Ð°Ð±Ð¾Ñ‚ÐºÐµ.",
-        "lang_prompt": "Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ·Ñ‹Ðº:",
-        "lang_set": "Ð¯Ð·Ñ‹Ðº: Ð ÑƒÑÑÐºÐ¸Ð¹",
-        "income": "Ð”Ð¾Ñ…Ð¾Ð´Ñ‹", "expense": "Ð Ð°ÑÑ…Ð¾Ð´Ñ‹", "balance": "Ð‘Ð°Ð»Ð°Ð½Ñ", "count": "ÐžÐ¿ÐµÑ€Ð°Ñ†Ð¸Ð¹",
-        "top": "Ð¢Ð¾Ð¿ Ñ€Ð°ÑÑ…Ð¾Ð´Ð¾Ð² Ð¿Ð¾ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸ÑÐ¼:", "no_category": "Ð‘ÐµÐ· ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸",
-        "cats": {"food": "Ð•Ð´Ð°", "transport": "Ð¢Ñ€Ð°Ð½ÑÐ¿Ð¾Ñ€Ñ‚", "home": "Ð–Ð¸Ð»ÑŒÑ‘", "shopping": "ÐŸÐ¾ÐºÑƒÐ¿ÐºÐ¸",
-                 "health": "Ð—Ð´Ð¾Ñ€Ð¾Ð²ÑŒÐµ", "fun": "Ð”Ð¾ÑÑƒÐ³", "other": "Ð”Ñ€ÑƒÐ³Ð¾Ðµ",
-                 "salary": "Ð—Ð°Ñ€Ð¿Ð»Ð°Ñ‚Ð°", "business": "Ð‘Ð¸Ð·Ð½ÐµÑ"},
+        "prompt_add_expense": "Напиши сумму и описание расхода, например: кофе 1500",
+        "prompt_add_income": "Напиши сумму и описание дохода, например: зарплата 400000",
+        "no_amount": "Не вижу сумму. Напиши, например: кофе 1500",
+        "saved": "✅ Записано:",
+        "cat_prompt": "Категория (по желанию):",
+        "denied": "Доступ закрыт.",
+        "error": "Произошла ошибка при обработке.",
+        "lang_prompt": "Выбери язык:",
+        "lang_set": "Язык: Русский",
+        "income": "Доходы", "expense": "Расходы", "balance": "Баланс", "count": "Операций",
+        "top": "Топ расходов по категориям:", "no_category": "Без категории",
+        "cats": {"food": "Еда", "transport": "Транспорт", "home": "Жильё", "shopping": "Покупки",
+                 "health": "Здоровье", "fun": "Досуг", "other": "Другое",
+                 "salary": "Зарплата", "business": "Бизнес"},
         "titles": {
-            ("week", False): "Ð¢ÐµÐºÑƒÑ‰Ð°Ñ Ð½ÐµÐ´ÐµÐ»Ñ", ("week", True): "ÐŸÑ€Ð¾ÑˆÐ»Ð°Ñ Ð½ÐµÐ´ÐµÐ»Ñ",
-            ("month", False): "Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ Ð¼ÐµÑÑÑ†", ("month", True): "ÐŸÑ€Ð¾ÑˆÐ»Ñ‹Ð¹ Ð¼ÐµÑÑÑ†",
-            ("year", False): "Ð¢ÐµÐºÑƒÑ‰Ð¸Ð¹ Ð³Ð¾Ð´", ("year", True): "ÐŸÑ€Ð¾ÑˆÐ»Ñ‹Ð¹ Ð³Ð¾Ð´",
+            ("week", False): "Текущая неделя", ("week", True): "Прошлая неделя",
+            ("month", False): "Текущий месяц", ("month", True): "Прошлый месяц",
+            ("year", False): "Текущий год", ("year", True): "Прошлый год",
         },
     },
     "en": {
         "help": (
-            "ðŸ’° Finance assistant\n\n"
-            "Tap âž– Expense or âž• Income, then type the amount and a description, e.g.: coffee 1500.\n"
+            "💰 Finance assistant\n\n"
+            "Tap ➖ Expense or ➕ Income, then type the amount and a description, e.g.: coffee 1500.\n"
             "I also understand \"yesterday\".\n\n"
-            "ðŸ“Š Week / Month / Year â€” reports. Past periods: /lastweek /lastmonth /lastyear\n"
-            "ðŸŒ Language â€” change language"
+            "📊 Week / Month / Year — reports. Past periods: /lastweek /lastmonth /lastyear\n"
+            "🌐 Language — change language"
         ),
         "menu": {
-            "add_expense": "âž– Expense", "add_income": "âž• Income",
-            "week": "ðŸ“Š Week", "month": "ðŸ“Š Month", "year": "ðŸ“Š Year",
-            "lang": "ðŸŒ Language",
+            "add_expense": "➖ Expense", "add_income": "➕ Income",
+            "week": "📊 Week", "month": "📊 Month", "year": "📊 Year",
+            "lang": "🌐 Language",
         },
         "prompt_add_expense": "Type the amount and a description of the expense, e.g.: coffee 1500",
         "prompt_add_income": "Type the amount and a description of the income, e.g.: salary 400000",
         "no_amount": "I can't see an amount. Try: coffee 1500",
-        "saved": "âœ… Saved:",
+        "saved": "✅ Saved:",
         "cat_prompt": "Category (optional):",
         "denied": "Access denied.",
         "error": "Something went wrong.",
@@ -102,35 +104,35 @@ T = {
     },
     "kk": {
         "help": (
-            "ðŸ’° ÒšÐ°Ñ€Ð¶Ñ‹Ð»Ñ‹Ò› ÐºÓ©Ð¼ÐµÐºÑˆÑ–\n\n"
-            "âž– Ð¨Ñ‹Ò“Ñ‹Ñ Ð½ÐµÐ¼ÐµÑÐµ âž• ÐšÑ–Ñ€Ñ–Ñ Ð±Ð°Ñ‚Ñ‹Ñ€Ð¼Ð°ÑÑ‹Ð½ Ð±Ð°ÑÑ‹Ð¿, ÑÐ¾Ð¼Ð°Ð½Ñ‹ Ð¶Ó™Ð½Ðµ ÑÐ¸Ð¿Ð°Ñ‚Ñ‚Ð°Ð¼Ð°Ð½Ñ‹ Ð¶Ð°Ð·, Ð¼Ñ‹ÑÐ°Ð»Ñ‹: ÐºÐ¾Ñ„Ðµ 1500.\n"
-            "Â«ÐšÐµÑˆÐµÂ» Ð´ÐµÐ³ÐµÐ½ ÑÓ©Ð·Ð´Ñ– Ð´Ðµ Ñ‚Ò¯ÑÑ–Ð½ÐµÐ¼Ñ–Ð½.\n\n"
-            "ðŸ“Š ÐÐ¿Ñ‚Ð° / ÐÐ¹ / Ð–Ñ‹Ð» â€” ÐµÑÐµÐ¿Ñ‚ÐµÑ€. Ó¨Ñ‚ÐºÐµÐ½ ÐºÐµÐ·ÐµÒ£Ð´ÐµÑ€: /lastweek /lastmonth /lastyear\n"
-            "ðŸŒ Ð¢Ñ–Ð» â€” Ñ‚Ñ–Ð»Ð´Ñ– Ð°ÑƒÑ‹ÑÑ‚Ñ‹Ñ€Ñƒ"
+            "💰 Қаржылық көмекші\n\n"
+            "➖ Шығыс немесе ➕ Кіріс батырмасын басып, соманы және сипаттаманы жаз, мысалы: кофе 1500.\n"
+            "«Кеше» деген сөзді де түсінемін.\n\n"
+            "📊 Апта / Ай / Жыл — есептер. Өткен кезеңдер: /lastweek /lastmonth /lastyear\n"
+            "🌐 Тіл — тілді ауыстыру"
         ),
         "menu": {
-            "add_expense": "âž– Ð¨Ñ‹Ò“Ñ‹Ñ", "add_income": "âž• ÐšÑ–Ñ€Ñ–Ñ",
-            "week": "ðŸ“Š ÐÐ¿Ñ‚Ð°", "month": "ðŸ“Š ÐÐ¹", "year": "ðŸ“Š Ð–Ñ‹Ð»",
-            "lang": "ðŸŒ Ð¢Ñ–Ð»",
+            "add_expense": "➖ Шығыс", "add_income": "➕ Кіріс",
+            "week": "📊 Апта", "month": "📊 Ай", "year": "📊 Жыл",
+            "lang": "🌐 Тіл",
         },
-        "prompt_add_expense": "Ð¨Ñ‹Ò“Ñ‹ÑÑ‚Ñ‹Ò£ ÑÐ¾Ð¼Ð°ÑÑ‹Ð½ Ð¶Ó™Ð½Ðµ ÑÐ¸Ð¿Ð°Ñ‚Ñ‚Ð°Ð¼Ð°ÑÑ‹Ð½ Ð¶Ð°Ð·, Ð¼Ñ‹ÑÐ°Ð»Ñ‹: ÐºÐ¾Ñ„Ðµ 1500",
-        "prompt_add_income": "ÐšÑ–Ñ€Ñ–ÑÑ‚Ñ–Ò£ ÑÐ¾Ð¼Ð°ÑÑ‹Ð½ Ð¶Ó™Ð½Ðµ ÑÐ¸Ð¿Ð°Ñ‚Ñ‚Ð°Ð¼Ð°ÑÑ‹Ð½ Ð¶Ð°Ð·, Ð¼Ñ‹ÑÐ°Ð»Ñ‹: Ð¶Ð°Ð»Ð°Ò›Ñ‹ 400000",
-        "no_amount": "Ð¡Ð¾Ð¼Ð°Ð½Ñ‹ ÐºÓ©Ñ€Ð¼ÐµÐ´Ñ–Ð¼. ÐœÑ‹ÑÐ°Ð»Ñ‹: ÐºÐ¾Ñ„Ðµ 1500",
-        "saved": "âœ… Ð–Ð°Ð·Ñ‹Ð»Ð´Ñ‹:",
-        "cat_prompt": "Ð¡Ð°Ð½Ð°Ñ‚ (Ò›Ð°Ð»Ð°ÑƒÑ‹Ò£ÑˆÐ°):",
-        "denied": "ÒšÐ¾Ð»Ð¶ÐµÑ‚Ñ–Ð¼Ð´Ñ–Ð»Ñ–Ðº Ð¶Ð°Ð±Ñ‹Ò›.",
-        "error": "Ó¨Ò£Ð´ÐµÑƒ ÐºÐµÐ·Ñ–Ð½Ð´Ðµ Ò›Ð°Ñ‚Ðµ ÑˆÑ‹Ò›Ñ‚Ñ‹.",
-        "lang_prompt": "Ð¢Ñ–Ð»Ð´Ñ– Ñ‚Ð°Ò£Ð´Ð°:",
-        "lang_set": "Ð¢Ñ–Ð»: ÒšÐ°Ð·Ð°Ò›ÑˆÐ°",
-        "income": "ÐšÑ–Ñ€Ñ–Ñ", "expense": "Ð¨Ñ‹Ò“Ñ‹Ñ", "balance": "Ð‘Ð°Ð»Ð°Ð½Ñ", "count": "ÐžÐ¿ÐµÑ€Ð°Ñ†Ð¸ÑÐ»Ð°Ñ€",
-        "top": "Ð¡Ð°Ð½Ð°Ñ‚Ñ‚Ð°Ñ€ Ð±Ð¾Ð¹Ñ‹Ð½ÑˆÐ° ÑˆÑ‹Ò“Ñ‹ÑÑ‚Ð°Ñ€ Ò¯Ð·Ð´Ñ–Ð³Ñ–:", "no_category": "Ð¡Ð°Ð½Ð°Ñ‚ÑÑ‹Ð·",
-        "cats": {"food": "Ð¢Ð°Ð¼Ð°Ò›", "transport": "ÐšÓ©Ð»Ñ–Ðº", "home": "Ð¢Ò±Ñ€Ò“Ñ‹Ð½ Ò¯Ð¹", "shopping": "Ð¡Ð°Ñ‚Ñ‹Ð¿ Ð°Ð»Ñƒ",
-                 "health": "Ð”ÐµÐ½ÑÐ°ÑƒÐ»Ñ‹Ò›", "fun": "Ð”ÐµÐ¼Ð°Ð»Ñ‹Ñ", "other": "Ð‘Ð°ÑÒ›Ð°",
-                 "salary": "Ð–Ð°Ð»Ð°Ò›Ñ‹", "business": "Ð‘Ð¸Ð·Ð½ÐµÑ"},
+        "prompt_add_expense": "Шығыстың сомасын және сипаттамасын жаз, мысалы: кофе 1500",
+        "prompt_add_income": "Кірістің сомасын және сипаттамасын жаз, мысалы: жалақы 400000",
+        "no_amount": "Соманы көрмедім. Мысалы: кофе 1500",
+        "saved": "✅ Жазылды:",
+        "cat_prompt": "Санат (қалауыңша):",
+        "denied": "Қолжетімділік жабық.",
+        "error": "Өңдеу кезінде қате шықты.",
+        "lang_prompt": "Тілді таңда:",
+        "lang_set": "Тіл: Қазақша",
+        "income": "Кіріс", "expense": "Шығыс", "balance": "Баланс", "count": "Операциялар",
+        "top": "Санаттар бойынша шығыстар үздігі:", "no_category": "Санатсыз",
+        "cats": {"food": "Тамақ", "transport": "Көлік", "home": "Тұрғын үй", "shopping": "Сатып алу",
+                 "health": "Денсаулық", "fun": "Демалыс", "other": "Басқа",
+                 "salary": "Жалақы", "business": "Бизнес"},
         "titles": {
-            ("week", False): "ÐžÑÑ‹ Ð°Ð¿Ñ‚Ð°", ("week", True): "Ó¨Ñ‚ÐºÐµÐ½ Ð°Ð¿Ñ‚Ð°",
-            ("month", False): "ÐžÑÑ‹ Ð°Ð¹", ("month", True): "Ó¨Ñ‚ÐºÐµÐ½ Ð°Ð¹",
-            ("year", False): "ÐžÑÑ‹ Ð¶Ñ‹Ð»", ("year", True): "Ó¨Ñ‚ÐºÐµÐ½ Ð¶Ñ‹Ð»",
+            ("week", False): "Осы апта", ("week", True): "Өткен апта",
+            ("month", False): "Осы ай", ("month", True): "Өткен ай",
+            ("year", False): "Осы жыл", ("year", True): "Өткен жыл",
         },
     },
 }
@@ -173,7 +175,11 @@ def tg(method, payload):
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
-    return urllib.request.urlopen(req, timeout=10).read()
+    try:
+        return urllib.request.urlopen(req, timeout=10).read()
+    except urllib.error.HTTPError as e:
+        print(f"Telegram {method} failed: {e.code} {e.read().decode('utf-8', 'replace')[:300]}")
+        raise
 
 
 def send_message(chat_id, text, reply_markup=None):
@@ -188,7 +194,7 @@ def send_message(chat_id, text, reply_markup=None):
 
 @contextmanager
 def db():
-    # Ð’ serverless ÑÐ¾ÐµÐ´Ð¸Ð½ÐµÐ½Ð¸Ðµ Ð¾Ð±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÐµÐ¼ ÑÐ°Ð¼Ð¸
+    # В serverless соединение обязательно закрываем сами
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     try:
         with conn.cursor() as cur:
@@ -199,7 +205,7 @@ def db():
 
 
 def get_user(user_id):
-    """Ð¯Ð·Ñ‹Ðº Ð¸ Ñ‚ÐµÐºÑƒÑ‰Ð¸Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼ Ð²Ð²Ð¾Ð´Ð° Ð¾Ð´Ð½Ð¸Ð¼ Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð¼. Ð ÐµÐ¶Ð¸Ð¼ Ð¶Ð¸Ð²Ñ‘Ñ‚ 30 Ð¼Ð¸Ð½ÑƒÑ‚."""
+    """Язык и текущий режим ввода одним запросом. Режим живёт 30 минут."""
     try:
         with db() as cur:
             cur.execute(
@@ -266,7 +272,7 @@ def set_category(user_id, tx_id, category):
 
 
 def get_report(user_id, start, end):
-    """Ð’ÑÐµ ÑÑƒÐ¼Ð¼Ñ‹ ÑÑ‡Ð¸Ñ‚Ð°ÑŽÑ‚ÑÑ Ð² SQL, Ð±ÐµÐ· Ð»Ð¸Ð¼Ð¸Ñ‚Ð¾Ð² Ð½Ð° ÐºÐ¾Ð»Ð¸Ñ‡ÐµÑÑ‚Ð²Ð¾ ÑÑ‚Ñ€Ð¾Ðº."""
+    """Все суммы считаются в SQL, без лимитов на количество строк."""
     with db() as cur:
         cur.execute(
             """
@@ -298,18 +304,18 @@ def get_report(user_id, start, end):
             "count": count, "top": top}
 
 # ============================================================
-# PARSING (Ð±ÐµÐ· Ð˜Ð˜: ÑÑƒÐ¼Ð¼Ð° = Ð¿Ð¾ÑÐ»ÐµÐ´Ð½ÐµÐµ Ñ‡Ð¸ÑÐ»Ð¾ Ð² ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ð¸)
+# PARSING (без ИИ: сумма = последнее число в сообщении)
 # ============================================================
 
 AMOUNT_RE = re.compile(
-    r"(\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(Ð¼Ð¸Ð»Ð»Ð¸Ð¾Ð½\w*|million|Ð¼Ð»Ð½|Ñ‚Ñ‹Ñ\w*|Ð¼Ñ‹Ò£|Ðº|k|m)?(?=\s|$|[^\w])",
+    r"(\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(миллион\w*|million|млн|тыс\w*|мың|к|k|m)?(?=\s|$|[^\w])",
     re.IGNORECASE,
 )
 
 DATE_WORDS = [
-    (re.compile(r"\b(?:Ð¿Ð¾Ð·Ð°Ð²Ñ‡ÐµÑ€Ð°|day before yesterday)\b", re.IGNORECASE), 2),
-    (re.compile(r"\b(?:Ð²Ñ‡ÐµÑ€Ð°|yesterday|ÐºÐµÑˆÐµ)\b", re.IGNORECASE), 1),
-    (re.compile(r"\b(?:ÑÐµÐ³Ð¾Ð´Ð½Ñ|today|Ð±Ò¯Ð³Ñ–Ð½)\b", re.IGNORECASE), 0),
+    (re.compile(r"\b(?:позавчера|day before yesterday)\b", re.IGNORECASE), 2),
+    (re.compile(r"\b(?:вчера|yesterday|кеше)\b", re.IGNORECASE), 1),
+    (re.compile(r"\b(?:сегодня|today|бүгін)\b", re.IGNORECASE), 0),
 ]
 
 
@@ -325,7 +331,7 @@ def parse_entry(text):
         return None
     suffix = (m.group(2) or "").lower()
     if suffix:
-        big = suffix.startswith(("Ð¼Ð¸Ð»Ð»Ð¸Ð¾Ð½", "million", "Ð¼Ð»Ð½", "m"))
+        big = suffix.startswith(("миллион", "million", "млн", "m"))
         amount *= 1_000_000 if big else 1000
     if amount <= 0:
         return None
@@ -348,14 +354,14 @@ def parse_entry(text):
 def money(val):
     val = float(val)
     text = f"{int(val):,}" if val.is_integer() else f"{val:,.2f}"
-    return text.replace(",", " ") + " â‚¸"
+    return text.replace(",", " ") + " ₸"
 
 
 def period_range(period, previous=False):
     today = datetime.now(TZ).date()
 
     if period == "week":
-        start = today - timedelta(days=today.weekday())  # Ð¿Ð¾Ð½ÐµÐ´ÐµÐ»ÑŒÐ½Ð¸Ðº
+        start = today - timedelta(days=today.weekday())  # понедельник
         if previous:
             start -= timedelta(days=7)
             return start, start + timedelta(days=6)
@@ -377,16 +383,16 @@ def period_range(period, previous=False):
 def format_report(lang, period, previous, start, end, rep):
     t = T[lang]
     lines = [
-        f"ðŸ“Š {t['titles'][(period, previous)]} ({start:%d.%m.%Y} â€” {end:%d.%m.%Y})",
+        f"📊 {t['titles'][(period, previous)]} ({start:%d.%m.%Y} — {end:%d.%m.%Y})",
         "",
-        f"âž• {t['income']}: {money(rep['income'])}",
-        f"âž– {t['expense']}: {money(rep['expense'])}",
-        f"ðŸ’¼ {t['balance']}: {money(rep['balance'])}",
-        f"ðŸ§¾ {t['count']}: {rep['count']}",
+        f"➕ {t['income']}: {money(rep['income'])}",
+        f"➖ {t['expense']}: {money(rep['expense'])}",
+        f"💼 {t['balance']}: {money(rep['balance'])}",
+        f"🧾 {t['count']}: {rep['count']}",
     ]
     if rep["top"]:
         lines += ["", t["top"]]
-        lines += [f"â€¢ {cat_label(lang, r['category'])}: {money(r['total'])}" for r in rep["top"]]
+        lines += [f"• {cat_label(lang, r['category'])}: {money(r['total'])}" for r in rep["top"]]
     return "\n".join(lines)
 
 
@@ -460,7 +466,7 @@ def process_callback(cb):
     elif data.startswith("cat:"):
         _, tx_id, key = data.split(":", 2)
         set_category(user_id, int(tx_id), key)
-        tg("answerCallbackQuery", {"callback_query_id": cb["id"], "text": "âœ… " + cat_label(lang, key)})
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"], "text": "✅ " + cat_label(lang, key)})
         tg("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
                                       "reply_markup": {"inline_keyboard": []}})
     else:
@@ -490,19 +496,19 @@ def process_message(message):
 
     first = text.split()[0].split("@")[0].lower()
 
-    # 1. Ð¡Ñ‚Ð°Ñ€Ñ‚ Ð¸ ÑÐ¿Ñ€Ð°Ð²ÐºÐ°
+    # 1. Старт и справка
     if first in ("/start", "/help"):
         set_state(user_id, None)
         send_message(chat_id, t["help"], reply_markup=menu_markup(lang))
         return
 
-    # 2. ÐšÐ½Ð¾Ð¿ÐºÐ¸ Ð¿Ð°Ð½ÐµÐ»Ð¸ Ð¸ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹
+    # 2. Кнопки панели и команды
     action = LABEL_TO_ACTION.get(text) or COMMANDS.get(first)
     if action:
         run_action(action, chat_id, user_id, lang)
         return
 
-    # 3. Ð’Ð²Ð¾Ð´ Ð¿Ð¾ÑÐ»Ðµ Ð½Ð°Ð¶Ð°Ñ‚Ð¸Ñ ÐºÐ½Ð¾Ð¿ÐºÐ¸
+    # 3. Ввод после нажатия кнопки
     if state in ("add_expense", "add_income"):
         entry = parse_entry(text)
         if not entry:
@@ -520,7 +526,7 @@ def process_message(message):
         send_message(chat_id, "\n".join(lines), reply_markup=category_keyboard(state, tx_id, lang))
         return
 
-    # 4. ÐžÐ±Ñ‹Ñ‡Ð½Ð¾Ðµ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ Ð²Ð½Ðµ Ñ€ÐµÐ¶Ð¸Ð¼Ð° â€” Ð¼Ð¾Ð»Ñ‡Ð¸Ð¼
+    # 4. Обычное сообщение вне режима — молчим
     return
 
 
@@ -533,6 +539,41 @@ def process_update(update):
 # ============================================================
 # VERCEL HANDLER
 # ============================================================
+
+def diagnostics():
+    """Подробная проверка: таблицы, токен, вебхук. Только по ?key=WEBHOOK_SECRET."""
+    lines = []
+    try:
+        with db() as cur:
+            cur.execute(
+                """
+                SELECT to_regclass('public.transactions') IS NOT NULL AS transactions,
+                       to_regclass('public.user_settings') IS NOT NULL AS user_settings,
+                       to_regclass('public.user_state') IS NOT NULL AS user_state;
+                """
+            )
+            row = cur.fetchone()
+        for name, ok in row.items():
+            lines.append(f"Table {name}: {'OK' if ok else 'MISSING (run schema.sql)'}")
+    except Exception as e:
+        lines.append("Tables check error: " + type(e).__name__)
+
+    for method in ("getMe", "getWebhookInfo"):
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{method}"
+            data = json.loads(urllib.request.urlopen(url, timeout=10).read())["result"]
+            if method == "getMe":
+                lines.append("Telegram token: OK, bot @" + str(data.get("username")))
+            else:
+                lines.append("Webhook url: " + (data.get("url") or "NOT SET"))
+                lines.append("Webhook pending updates: " + str(data.get("pending_update_count")))
+                lines.append("Webhook last error: " + str(data.get("last_error_message") or "none"))
+        except urllib.error.HTTPError as e:
+            lines.append(f"Telegram {method}: HTTP {e.code} (check TELEGRAM_TOKEN)")
+        except Exception as e:
+            lines.append(f"Telegram {method} error: " + type(e).__name__)
+    return lines
+
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -556,7 +597,7 @@ class handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-        # Ð’ÑÐµÐ³Ð´Ð° 200, Ð¸Ð½Ð°Ñ‡Ðµ Telegram Ð±ÑƒÐ´ÐµÑ‚ Ð±ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ð¾ Ñ€ÐµÑ‚Ñ€Ð°Ð¸Ñ‚ÑŒ Ð°Ð¿Ð´ÐµÐ¹Ñ‚
+        # Всегда 200, иначе Telegram будет бесконечно ретраить апдейт
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -575,6 +616,9 @@ class handler(BaseHTTPRequestHandler):
                 lines.append("Database: OK")
             except Exception as e:
                 lines.append("Database error: " + type(e).__name__)
+        key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
+        if not missing and (not WEBHOOK_SECRET or key == WEBHOOK_SECRET):
+            lines += diagnostics()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
