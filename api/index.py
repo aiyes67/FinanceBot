@@ -348,7 +348,7 @@ def clear_menu_keyboard(lang):
         [{"text": T[lang]["clear_incomes"], "callback_data": "clear:income"}],
         [{"text": T[lang]["clear_all"], "callback_data": "clear:all"}],
         [{"text": T[lang]["clear_cancel"], "callback_data": "clear:cancel"}],
-    ]}
+    ]]}
 
 
 def clear_confirm_keyboard(lang, mode):
@@ -473,7 +473,6 @@ def delete_transaction(user_id, tx_id):
 
 
 def clear_transactions(user_id, mode):
-    """mode: 'expense' | 'income' | 'all'"""
     with db() as cur:
         if mode == "all":
             cur.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
@@ -723,4 +722,6 @@ def short_label(lang, period, start, end):
     if period == "day":
         return f"{start:%d.%m}"
     if period == "week":
-       
+        return f"{start:%d.%m}–{end:%d.%m}"
+    if period == "month":
+        return f"{MON
