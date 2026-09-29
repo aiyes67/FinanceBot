@@ -12,10 +12,6 @@ from zoneinfo import ZoneInfo
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# ============================================================
-# CONFIG
-# ============================================================
-
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 try:
@@ -31,16 +27,11 @@ except Exception:
 
 LANGS = {"ru": "Русский", "en": "English", "kk": "Қазақша"}
 
-# ============================================================
-# TRANSLATIONS
-# ============================================================
-
 T = {
     "ru": {
         "help": (
             "💰 Финансовый помощник\n\n"
-            "Нажми ➖ Расход или ➕ Доход, потом напиши сумму и описание, например: кофе 1500.\n"
-            "Слова «вчера» и «позавчера» тоже понимаю.\n\n"
+            "Нажми ➖ Расход или ➕ Доход, потом напиши сумму и описание, например: кофе 1500.\n\n"
             "📅 День / 📊 Неделя / Месяц / Год — отчёты, листай ◀ ▶.\n"
             "🧾 Транзакции — список операций, там же удаление.\n"
             "💼 Баланс — итог за всё время и очистка истории.\n"
@@ -77,14 +68,11 @@ T = {
         "tx_title": "🧾 Транзакции",
         "tx_page": "Стр. {n}/{total}",
         "tx_deleted": "Удалено.",
-        "tx_not_found": "Операция не найдена.",
         "del_btn": "🗑",
         "del_confirm": "Удалить эту операцию?",
         "del_yes": "🗑 Удалить",
         "del_no": "↩️ Отмена",
         "balance_title": "💼 Общий баланс",
-        "avg_expense": "Средний расход",
-        "avg_income": "Средний доход",
         "first_tx": "Первая",
         "last_tx": "Последняя",
         "clear_btn": "🧹 Очистить историю",
@@ -103,8 +91,7 @@ T = {
     "en": {
         "help": (
             "💰 Finance assistant\n\n"
-            "Tap ➖ Expense or ➕ Income, then type the amount and a description, e.g.: coffee 1500.\n"
-            "I also understand \"yesterday\".\n\n"
+            "Tap ➖ Expense or ➕ Income, then type the amount and a description, e.g.: coffee 1500.\n\n"
             "📅 Day / 📊 Week / Month / Year — reports, browse with ◀ ▶.\n"
             "🧾 Transactions — list with delete.\n"
             "💼 Balance — all-time totals and history cleanup.\n"
@@ -141,14 +128,11 @@ T = {
         "tx_title": "🧾 Transactions",
         "tx_page": "Page {n}/{total}",
         "tx_deleted": "Deleted.",
-        "tx_not_found": "Transaction not found.",
         "del_btn": "🗑",
         "del_confirm": "Delete this transaction?",
         "del_yes": "🗑 Delete",
         "del_no": "↩️ Cancel",
         "balance_title": "💼 Total balance",
-        "avg_expense": "Avg expense",
-        "avg_income": "Avg income",
         "first_tx": "First",
         "last_tx": "Last",
         "clear_btn": "🧹 Clear history",
@@ -167,8 +151,7 @@ T = {
     "kk": {
         "help": (
             "💰 Қаржылық көмекші\n\n"
-            "➖ Шығыс немесе ➕ Кіріс батырмасын басып, соманы және сипаттаманы жаз, мысалы: кофе 1500.\n"
-            "«Кеше» деген сөзді де түсінемін.\n\n"
+            "➖ Шығыс немесе ➕ Кіріс батырмасын басып, соманы және сипаттаманы жаз, мысалы: кофе 1500.\n\n"
             "📅 Күн / 📊 Апта / Ай / Жыл — есептер, ◀ ▶ арқылы ауыстыр.\n"
             "🧾 Транзакциялар — тізім және жою.\n"
             "💼 Баланс — жалпы қорытынды және тарихты тазалау.\n"
@@ -205,14 +188,11 @@ T = {
         "tx_title": "🧾 Транзакциялар",
         "tx_page": "Бет {n}/{total}",
         "tx_deleted": "Жойылды.",
-        "tx_not_found": "Операция табылмады.",
         "del_btn": "🗑",
         "del_confirm": "Осы операцияны жою керек пе?",
         "del_yes": "🗑 Жою",
         "del_no": "↩️ Болдырмау",
         "balance_title": "💼 Жалпы баланс",
-        "avg_expense": "Орташа шығыс",
-        "avg_income": "Орташа кіріс",
         "first_tx": "Бірінші",
         "last_tx": "Соңғы",
         "clear_btn": "🧹 Тарихты тазалау",
@@ -254,6 +234,7 @@ CATEGORY_KEYS = {
 
 REPORT_PERIODS = ("day", "week", "month", "year")
 TX_PER_PAGE = 10
+
 
 # ============================================================
 # KEYBOARDS
@@ -357,6 +338,7 @@ def clear_confirm_keyboard(lang, mode):
         {"text": T[lang]["clear_no"], "callback_data": "clear:cancel"},
     ]]}
 
+
 # ============================================================
 # TELEGRAM
 # ============================================================
@@ -367,18 +349,18 @@ def tg(method, payload):
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
-    try:
-        return urllib.request.urlopen(req, timeout=10).read()
-    except urllib.error.HTTPError as e:
-        print(f"Telegram {method} failed: {e.code} {e.read().decode('utf-8', 'replace')[:300]}")
-        raise
+    return urllib.request.urlopen(req, timeout=10).read()
 
 
 def send_message(chat_id, text, reply_markup=None):
     payload = {"chat_id": chat_id, "text": text[:4000]}
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    tg("sendMessage", payload)
+    try:
+        tg("sendMessage", payload)
+    except Exception as e:
+        print("send_message error:", repr(e))
+
 
 # ============================================================
 # DB
@@ -575,6 +557,7 @@ def first_transaction_date(user_id):
         )
         return cur.fetchone()["d"]
 
+
 # ============================================================
 # PARSING
 # ============================================================
@@ -631,6 +614,7 @@ def parse_entry(text):
     rest = NOISE_WORDS.sub(" ", rest)
     description = " ".join(rest.split())
     return amount, description, tx_date.isoformat()
+
 
 # ============================================================
 # HELPERS
@@ -724,4 +708,488 @@ def short_label(lang, period, start, end):
     if period == "week":
         return f"{start:%d.%m}–{end:%d.%m}"
     if period == "month":
-        return f"{MON
+        return f"{MONTHS[lang][start.month - 1]} {start.year}"
+    return str(start.year)
+
+
+def format_report(lang, period, offset, start, end, rep):
+    t = T[lang]
+    if period == "day":
+        header = f"📊 {period_title(lang, period, offset, start)}"
+    else:
+        header = (f"📊 {period_title(lang, period, offset, start)} "
+                  f"({start:%d.%m.%Y} — {end:%d.%m.%Y})")
+    lines = [
+        header,
+        "",
+        f"➕ {t['income']}: {money(rep['income'])}",
+        f"➖ {t['expense']}: {money(rep['expense'])}",
+        f"💼 {t['balance']}: {money(rep['balance'])}",
+        f"🧾 {t['count']}: {rep['count']}",
+    ]
+    if rep["top"]:
+        lines += ["", t["top"]]
+        lines += [f"• {cat_label(lang, r['category'])}: {money(r['total'])}" for r in rep["top"]]
+    return "\n".join(lines)
+
+
+def report_view(user_id, lang, period, offset):
+    first = first_transaction_date(user_id)
+    min_off = min_offset(period, first) if first else 0
+    if offset < min_off or offset > 0:
+        return None
+    start, end = period_bounds(period, offset)
+    rep = get_report(user_id, start, end)
+    return (format_report(lang, period, offset, start, end, rep),
+            report_keyboard(lang, period, offset, min_off))
+
+
+def send_report(chat_id, user_id, lang, period, offset=0):
+    view = report_view(user_id, lang, period, offset)
+    if view:
+        send_message(chat_id, view[0], reply_markup=view[1])
+        return
+    first = first_transaction_date(user_id)
+    extra = EXTRA[lang]
+    send_message(chat_id,
+                 extra["no_data"].format(d=f"{first:%d.%m.%Y}") if first else extra["no_tx"])
+
+
+def send_transactions_list(chat_id, user_id, lang, page=0):
+    t = T[lang]
+    rows, total = list_transactions(user_id, page)
+    if total == 0:
+        send_message(chat_id, t["tx_empty"])
+        return
+    total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
+    if page >= total_pages:
+        page = total_pages - 1
+        rows, total = list_transactions(user_id, page)
+    text = f"{t['tx_title']}\n{t['tx_page'].format(n=page + 1, total=total_pages)}"
+    send_message(chat_id, text,
+                 reply_markup=transactions_keyboard(lang, rows, page, total_pages))
+
+
+def send_balance(chat_id, user_id, lang):
+    t = T[lang]
+    b = get_balance(user_id)
+    if b["count"] == 0:
+        send_message(chat_id, t["tx_empty"])
+        return
+    lines = [
+        t["balance_title"],
+        "",
+        f"➕ {t['income']}: {money(b['income'])}  ({b['income_cnt']})",
+        f"➖ {t['expense']}: {money(b['expense'])}  ({b['expense_cnt']})",
+        f"💼 {t['balance']}: {money(b['balance'])}",
+        f"🧾 {t['count']}: {b['count']}",
+        "",
+        f"{t['first_tx']}: {b['first']:%d.%m.%Y}",
+        f"{t['last_tx']}: {b['last']:%d.%m.%Y}",
+    ]
+    send_message(chat_id, "\n".join(lines), reply_markup=balance_keyboard(lang))
+
+
+def send_delete_confirm(chat_id, user_id, lang, tx_id, message_id=None):
+    t = T[lang]
+    rows, _ = list_transactions(user_id, 0)
+    target = None
+    with db() as cur:
+        cur.execute(
+            "SELECT id, type, amount, description, transaction_date "
+            "FROM transactions WHERE id = %s AND user_id = %s",
+            (tx_id, user_id),
+        )
+        target = cur.fetchone()
+    if not target:
+        if message_id:
+            try:
+                tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                       "text": t["tx_empty"]})
+            except Exception:
+                pass
+        return
+    icon = "➖" if target["type"] == "expense" else "➕"
+    line = f"{icon} {money(target['amount'])} — {target['description'] or ''} ({target['transaction_date']:%d.%m})"
+    text = f"{t['del_confirm']}\n\n{line}"
+    if message_id:
+        try:
+            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                   "text": text,
+                                   "reply_markup": delete_confirm_keyboard(lang, tx_id)})
+            return
+        except Exception:
+            pass
+    send_message(chat_id, text, reply_markup=delete_confirm_keyboard(lang, tx_id))
+
+
+def send_clear_menu(chat_id, lang, message_id=None):
+    t = T[lang]
+    text = t["clear_choose"]
+    kb = clear_menu_keyboard(lang)
+    if message_id:
+        try:
+            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                   "text": text, "reply_markup": kb})
+            return
+        except Exception:
+            pass
+    send_message(chat_id, text, reply_markup=kb)
+
+
+def send_clear_confirm(chat_id, lang, mode, message_id=None):
+    t = T[lang]
+    what = {"expense": t["clear_expenses_what"],
+            "income": t["clear_incomes_what"],
+            "all": t["clear_all_what"]}[mode]
+    text = t["clear_confirm"].format(what=what)
+    kb = clear_confirm_keyboard(lang, mode)
+    if message_id:
+        try:
+            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                   "text": text, "reply_markup": kb})
+            return
+        except Exception:
+            pass
+    send_message(chat_id, text, reply_markup=kb)
+
+
+# ============================================================
+# ACTIONS
+# ============================================================
+
+def is_allowed(user_id):
+    return OWNER_ID == 0 or user_id == OWNER_ID
+
+
+def run_action(action, chat_id, user_id, lang):
+    t = T[lang]
+
+    if action in ("add_expense", "add_income"):
+        set_state(user_id, action)
+        send_message(chat_id, t[f"prompt_{action}"])
+
+    elif action == "lang":
+        set_state(user_id, None)
+        keyboard = {"inline_keyboard": [[
+            {"text": name, "callback_data": f"lang:{code}"} for code, name in LANGS.items()
+        ]]}
+        send_message(chat_id, t["lang_prompt"], reply_markup=keyboard)
+
+    elif action in REPORT_PERIODS:
+        set_state(user_id, None)
+        send_report(chat_id, user_id, lang, action, 0)
+
+    elif action == "yesterday":
+        set_state(user_id, None)
+        send_report(chat_id, user_id, lang, "day", -1)
+
+    elif action in ("lastweek", "lastmonth", "lastyear"):
+        set_state(user_id, None)
+        send_report(chat_id, user_id, lang, action[4:], -1)
+
+    elif action == "transactions":
+        set_state(user_id, None)
+        send_transactions_list(chat_id, user_id, lang, 0)
+
+    elif action == "balance":
+        set_state(user_id, None)
+        send_balance(chat_id, user_id, lang)
+
+
+# ============================================================
+# UPDATE PROCESSOR
+# ============================================================
+
+def process_callback(cb):
+    user_id = cb["from"]["id"]
+    chat_id = cb["message"]["chat"]["id"]
+    message_id = cb["message"]["message_id"]
+    data = cb.get("data", "")
+    stored_lang, _ = get_user(user_id)
+    lang = stored_lang if stored_lang in LANGS else "ru"
+
+    if not is_allowed(user_id):
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        return
+
+    if data == "noop":
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        return
+
+    if data.startswith("lang:") and data[5:] in LANGS:
+        lang = data[5:]
+        set_lang(user_id, lang)
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        tg("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
+                                      "reply_markup": {"inline_keyboard": []}})
+        send_message(chat_id, T[lang]["lang_set"] + "\n\n" + T[lang]["help"],
+                     reply_markup=menu_markup(lang))
+
+    elif data.startswith("cat:"):
+        _, tx_id, key = data.split(":", 2)
+        set_category(user_id, int(tx_id), key)
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"],
+                                   "text": "✅ " + cat_label(lang, key)})
+        tg("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
+                                      "reply_markup": {"inline_keyboard": []}})
+
+    elif data.startswith("rep:"):
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        try:
+            _, period, off = data.split(":")
+            offset = int(off)
+        except ValueError:
+            return
+        if period not in REPORT_PERIODS:
+            return
+        view = report_view(user_id, lang, period, offset)
+        if view:
+            try:
+                tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                       "text": view[0], "reply_markup": view[1]})
+            except Exception:
+                pass
+
+    elif data.startswith("txp:"):
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        try:
+            page = int(data[4:])
+        except ValueError:
+            return
+        rows, total = list_transactions(user_id, page)
+        if total == 0:
+            return
+        total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
+        if page >= total_pages:
+            page = total_pages - 1
+            rows, total = list_transactions(user_id, page)
+        text = f"{T[lang]['tx_title']}\n{T[lang]['tx_page'].format(n=page + 1, total=total_pages)}"
+        try:
+            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                   "text": text,
+                                   "reply_markup": transactions_keyboard(lang, rows, page, total_pages)})
+        except Exception:
+            pass
+
+    elif data.startswith("delok:"):
+        try:
+            tx_id = int(data[6:])
+        except ValueError:
+            tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+            return
+        ok = delete_transaction(user_id, tx_id)
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"],
+                                   "text": T[lang]["tx_deleted"] if ok else "—"})
+        rows, total = list_transactions(user_id, 0)
+        if total == 0:
+            try:
+                tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                       "text": T[lang]["tx_empty"]})
+            except Exception:
+                pass
+            return
+        total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
+        text = f"{T[lang]['tx_title']}\n{T[lang]['tx_page'].format(n=1, total=total_pages)}"
+        try:
+            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                   "text": text,
+                                   "reply_markup": transactions_keyboard(lang, rows, 0, total_pages)})
+        except Exception:
+            pass
+
+    elif data.startswith("del:"):
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        try:
+            tx_id = int(data[4:])
+        except ValueError:
+            return
+        send_delete_confirm(chat_id, user_id, lang, tx_id, message_id)
+
+    elif data == "delno":
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        rows, total = list_transactions(user_id, 0)
+        if total == 0:
+            try:
+                tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                       "text": T[lang]["tx_empty"]})
+            except Exception:
+                pass
+            return
+        total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
+        text = f"{T[lang]['tx_title']}\n{T[lang]['tx_page'].format(n=1, total=total_pages)}"
+        try:
+            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                   "text": text,
+                                   "reply_markup": transactions_keyboard(lang, rows, 0, total_pages)})
+        except Exception:
+            pass
+
+    elif data == "clear:menu":
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        send_clear_menu(chat_id, lang, message_id)
+
+    elif data in ("clear:expense", "clear:income", "clear:all"):
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        mode = data.split(":")[1]
+        send_clear_confirm(chat_id, lang, mode, message_id)
+
+    elif data == "clear:cancel":
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        try:
+            tg("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
+                                          "reply_markup": {"inline_keyboard": []}})
+        except Exception:
+            pass
+        send_balance(chat_id, user_id, lang)
+
+    elif data.startswith("clearok:"):
+        mode = data.split(":", 1)[1]
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        n = clear_transactions(user_id, mode)
+        try:
+            tg("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
+                                          "reply_markup": {"inline_keyboard": []}})
+        except Exception:
+            pass
+        send_message(chat_id, T[lang]["clear_done"].format(n=n))
+        send_balance(chat_id, user_id, lang)
+
+    else:
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+
+
+def process_message(message):
+    if not message.get("text"):
+        return
+
+    chat_id = message["chat"]["id"]
+    user_id = message["from"]["id"]
+    text = message["text"].strip()
+    if not text:
+        return
+
+    stored_lang, state = get_user(user_id)
+    if stored_lang in LANGS:
+        lang = stored_lang
+    else:
+        lang = {"kk": "kk", "en": "en"}.get(
+            (message["from"].get("language_code") or "")[:2], "ru")
+    t = T[lang]
+
+    if not is_allowed(user_id):
+        send_message(chat_id, t["denied"])
+        return
+
+    first = text.split()[0].split("@")[0].lower()
+
+    if first in ("/start", "/help"):
+        set_state(user_id, None)
+        send_message(chat_id, t["help"], reply_markup=menu_markup(lang))
+        return
+
+    action = LABEL_TO_ACTION.get(text) or COMMANDS.get(first)
+    if action:
+        run_action(action, chat_id, user_id, lang)
+        return
+
+    if state in ("add_expense", "add_income"):
+        entry = parse_entry(text)
+        if not entry:
+            send_message(chat_id, t["no_amount"])
+            return
+        amount, description, tx_date = entry
+        tx_type = "expense" if state == "add_expense" else "income"
+        tx_id = add_transaction(user_id, tx_type, amount, description, tx_date)
+        set_state(user_id, None)
+        sign = "-" if tx_type == "expense" else "+"
+        lines = [t["saved"], f"{sign}{money(amount)}"]
+        if description:
+            lines.append(description)
+        lines += ["", t["cat_prompt"]]
+        send_message(chat_id, "\n".join(lines),
+                     reply_markup=category_keyboard(state, tx_id, lang))
+        return
+
+    return
+
+
+def process_update(update):
+    if update.get("callback_query"):
+        process_callback(update["callback_query"])
+    elif update.get("message"):
+        process_message(update["message"])
+
+
+# ============================================================
+# VERCEL HANDLER
+# ============================================================
+
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if WEBHOOK_SECRET and self.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
+            self.send_response(403)
+            self.end_headers()
+            return
+
+        update = {}
+        try:
+            length = int(self.headers.get("content-length", 0))
+            update = json.loads(self.rfile.read(length).decode("utf-8"))
+            process_update(update)
+        except Exception as e:
+            print("Error:", repr(e))
+            try:
+                src = update.get("message") or update.get("callback_query") or {}
+                chat_id = (src.get("chat") or {}).get("id")
+                user_id = (src.get("from") or {}).get("id")
+                if chat_id and user_id:
+                    l, _ = get_user(user_id)
+                    send_message(chat_id, T[l if l in LANGS else "ru"]["error"])
+            except Exception as e2:
+                print("Error handler failed:", repr(e2))
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"ok": true}')
+
+    def do_GET(self):
+        lines = ["Bot is alive!"]
+        missing = [n for n in ("TELEGRAM_TOKEN", "DATABASE_URL") if not os.environ.get(n)]
+        if missing:
+            lines.append("Missing env vars: " + ", ".join(missing))
+        else:
+            try:
+                with db() as cur:
+                    cur.execute("SELECT to_regclass('public.transactions') AS a, "
+                                "to_regclass('public.user_settings') AS b, "
+                                "to_regclass('public.user_state') AS c")
+                    row = cur.fetchone()
+                lines.append("Table transactions: " + ("OK" if row["a"] else "MISSING"))
+                lines.append("Table user_settings: " + ("OK" if row["b"] else "MISSING"))
+                lines.append("Table user_state: " + ("OK" if row["c"] else "MISSING"))
+            except Exception as e:
+                lines.append("Database error: " + type(e).__name__ + " — " + str(e)[:200])
+
+        key = parse_qs(urlparse(self.path).query).get("key", [""])[0]
+        if not missing and (not WEBHOOK_SECRET or key == WEBHOOK_SECRET):
+            try:
+                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe"
+                data = json.loads(urllib.request.urlopen(url, timeout=10).read())["result"]
+                lines.append("Telegram token: OK, bot @" + str(data.get("username")))
+            except Exception as e:
+                lines.append("Telegram getMe error: " + type(e).__name__)
+            try:
+                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo"
+                data = json.loads(urllib.request.urlopen(url, timeout=10).read())["result"]
+                lines.append("Webhook url: " + (data.get("url") or "NOT SET"))
+                lines.append("Webhook pending: " + str(data.get("pending_update_count")))
+                lines.append("Webhook last error: " + str(data.get("last_error_message") or "none"))
+            except Exception as e:
+                lines.append("Telegram getWebhookInfo error: " + type(e).__name__)
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write("\n".join(lines).encode("utf-8"))
