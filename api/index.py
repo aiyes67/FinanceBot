@@ -32,10 +32,11 @@ T = {
         "help": (
             "💰 Финансовый помощник\n\n"
             "Нажми ➖ Расход или ➕ Доход, потом напиши сумму и описание, например: кофе 1500.\n\n"
-            "📅 День / 📊 Неделя / Месяц / Год — отчёты, листай ◀ ▶.\n"
+            "📅 День / 📊 Неделя / Месяц / Год — отчёты, листай ◀️ ▶️.\n"
             "🧾 Транзакции — список операций, там же удаление.\n"
             "💼 Баланс — итог за всё время и очистка истории.\n"
-            "🌐 Язык — сменить язык"
+            "🌐 Язык — сменить язык\n\n"
+            "Если кнопки пропали или устарели — команда /menu."
         ),
         "menu": {
             "add_expense": "➖ Расход", "add_income": "➕ Доход",
@@ -92,10 +93,11 @@ T = {
         "help": (
             "💰 Finance assistant\n\n"
             "Tap ➖ Expense or ➕ Income, then type the amount and a description, e.g.: coffee 1500.\n\n"
-            "📅 Day / 📊 Week / Month / Year — reports, browse with ◀ ▶.\n"
+            "📅 Day / 📊 Week / Month / Year — reports, browse with ◀️ ▶️.\n"
             "🧾 Transactions — list with delete.\n"
             "💼 Balance — all-time totals and history cleanup.\n"
-            "🌐 Language — change language"
+            "🌐 Language — change language\n\n"
+            "If the buttons are missing or outdated — use /menu."
         ),
         "menu": {
             "add_expense": "➖ Expense", "add_income": "➕ Income",
@@ -152,10 +154,11 @@ T = {
         "help": (
             "💰 Қаржылық көмекші\n\n"
             "➖ Шығыс немесе ➕ Кіріс батырмасын басып, соманы және сипаттаманы жаз, мысалы: кофе 1500.\n\n"
-            "📅 Күн / 📊 Апта / Ай / Жыл — есептер, ◀ ▶ арқылы ауыстыр.\n"
+            "📅 Күн / 📊 Апта / Ай / Жыл — есептер, ◀️ ▶️ арқылы ауыстыр.\n"
             "🧾 Транзакциялар — тізім және жою.\n"
             "💼 Баланс — жалпы қорытынды және тарихты тазалау.\n"
-            "🌐 Тіл — тілді ауыстыру"
+            "🌐 Тіл — тілді ауыстыру\n\n"
+            "Батырмалар жоғалса немесе ескірсе — /menu командасы."
         ),
         "menu": {
             "add_expense": "➖ Шығыс", "add_income": "➕ Кіріс",
@@ -225,6 +228,7 @@ COMMANDS = {
     "/yesterday": "yesterday",
     "/expense": "add_expense", "/income": "add_income", "/lang": "lang",
     "/transactions": "transactions", "/tx": "transactions", "/balance": "balance",
+    "/menu": "menu",
 }
 
 CATEGORY_KEYS = {
@@ -266,11 +270,11 @@ def report_keyboard(lang, period, offset, min_off):
     nav = []
     if offset - 1 >= min_off:
         s, e = period_bounds(period, offset - 1)
-        nav.append({"text": "◀ " + short_label(lang, period, s, e),
+        nav.append({"text": "◀️ " + short_label(lang, period, s, e),
                     "callback_data": f"rep:{period}:{offset - 1}"})
     if offset + 1 <= 0:
         s, e = period_bounds(period, offset + 1)
-        nav.append({"text": short_label(lang, period, s, e) + " ▶",
+        nav.append({"text": short_label(lang, period, s, e) + " ▶️",
                     "callback_data": f"rep:{period}:{offset + 1}"})
 
     views = [
@@ -301,11 +305,11 @@ def transactions_keyboard(lang, rows, page, total_pages):
 
     nav = []
     if page > 0:
-        nav.append({"text": "◀", "callback_data": f"txp:{page - 1}"})
+        nav.append({"text": "◀️", "callback_data": f"txp:{page - 1}"})
     nav.append({"text": T[lang]["tx_page"].format(n=page + 1, total=total_pages),
                 "callback_data": "noop"})
     if page + 1 < total_pages:
-        nav.append({"text": "▶", "callback_data": f"txp:{page + 1}"})
+        nav.append({"text": "▶️", "callback_data": f"txp:{page + 1}"})
     keyboard.append(nav)
     return {"inline_keyboard": keyboard}
 
@@ -329,13 +333,13 @@ def clear_menu_keyboard(lang):
         [{"text": T[lang]["clear_incomes"], "callback_data": "clear:income"}],
         [{"text": T[lang]["clear_all"], "callback_data": "clear:all"}],
         [{"text": T[lang]["clear_cancel"], "callback_data": "clear:cancel"}],
-    ]]}
+    ]}
 
 
 def clear_confirm_keyboard(lang, mode):
     return {"inline_keyboard": [[
         {"text": T[lang]["clear_yes"], "callback_data": f"clearok:{mode}"},
-        {"text": T[lang]["clear_no"], "callback_data": "clear:cancel"},
+        {"text": T[lang]["clear_cancel"], "callback_data": "clear:cancel"},
     ]]}
 
 
@@ -792,8 +796,6 @@ def send_balance(chat_id, user_id, lang):
 
 def send_delete_confirm(chat_id, user_id, lang, tx_id, message_id=None):
     t = T[lang]
-    rows, _ = list_transactions(user_id, 0)
-    target = None
     with db() as cur:
         cur.execute(
             "SELECT id, type, amount, description, transaction_date "
@@ -869,6 +871,10 @@ def run_action(action, chat_id, user_id, lang):
         set_state(user_id, action)
         send_message(chat_id, t[f"prompt_{action}"])
 
+    elif action == "menu":
+        set_state(user_id, None)
+        send_message(chat_id, "👇", reply_markup=menu_markup(lang))
+
     elif action == "lang":
         set_state(user_id, None)
         keyboard = {"inline_keyboard": [[
@@ -900,6 +906,28 @@ def run_action(action, chat_id, user_id, lang):
 # ============================================================
 # UPDATE PROCESSOR
 # ============================================================
+
+def _edit_tx_page(chat_id, message_id, user_id, lang, page):
+    rows, total = list_transactions(user_id, page)
+    if total == 0:
+        try:
+            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                   "text": T[lang]["tx_empty"]})
+        except Exception:
+            pass
+        return
+    total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
+    if page >= total_pages:
+        page = total_pages - 1
+        rows, total = list_transactions(user_id, page)
+    text = f"{T[lang]['tx_title']}\n{T[lang]['tx_page'].format(n=page + 1, total=total_pages)}"
+    try:
+        tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                               "text": text,
+                               "reply_markup": transactions_keyboard(lang, rows, page, total_pages)})
+    except Exception:
+        pass
+
 
 def process_callback(cb):
     user_id = cb["from"]["id"]
@@ -957,20 +985,7 @@ def process_callback(cb):
             page = int(data[4:])
         except ValueError:
             return
-        rows, total = list_transactions(user_id, page)
-        if total == 0:
-            return
-        total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
-        if page >= total_pages:
-            page = total_pages - 1
-            rows, total = list_transactions(user_id, page)
-        text = f"{T[lang]['tx_title']}\n{T[lang]['tx_page'].format(n=page + 1, total=total_pages)}"
-        try:
-            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
-                                   "text": text,
-                                   "reply_markup": transactions_keyboard(lang, rows, page, total_pages)})
-        except Exception:
-            pass
+        _edit_tx_page(chat_id, message_id, user_id, lang, page)
 
     elif data.startswith("delok:"):
         try:
@@ -981,22 +996,7 @@ def process_callback(cb):
         ok = delete_transaction(user_id, tx_id)
         tg("answerCallbackQuery", {"callback_query_id": cb["id"],
                                    "text": T[lang]["tx_deleted"] if ok else "—"})
-        rows, total = list_transactions(user_id, 0)
-        if total == 0:
-            try:
-                tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
-                                       "text": T[lang]["tx_empty"]})
-            except Exception:
-                pass
-            return
-        total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
-        text = f"{T[lang]['tx_title']}\n{T[lang]['tx_page'].format(n=1, total=total_pages)}"
-        try:
-            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
-                                   "text": text,
-                                   "reply_markup": transactions_keyboard(lang, rows, 0, total_pages)})
-        except Exception:
-            pass
+        _edit_tx_page(chat_id, message_id, user_id, lang, 0)
 
     elif data.startswith("del:"):
         tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
@@ -1008,22 +1008,7 @@ def process_callback(cb):
 
     elif data == "delno":
         tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
-        rows, total = list_transactions(user_id, 0)
-        if total == 0:
-            try:
-                tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
-                                       "text": T[lang]["tx_empty"]})
-            except Exception:
-                pass
-            return
-        total_pages = max(1, (total + TX_PER_PAGE - 1) // TX_PER_PAGE)
-        text = f"{T[lang]['tx_title']}\n{T[lang]['tx_page'].format(n=1, total=total_pages)}"
-        try:
-            tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
-                                   "text": text,
-                                   "reply_markup": transactions_keyboard(lang, rows, 0, total_pages)})
-        except Exception:
-            pass
+        _edit_tx_page(chat_id, message_id, user_id, lang, 0)
 
     elif data == "clear:menu":
         tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
@@ -1046,6 +1031,8 @@ def process_callback(cb):
     elif data.startswith("clearok:"):
         mode = data.split(":", 1)[1]
         tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        if mode not in ("expense", "income", "all"):
+            return
         n = clear_transactions(user_id, mode)
         try:
             tg("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
@@ -1122,7 +1109,7 @@ def process_update(update):
 
 
 # ============================================================
-# VERCEL HANDLER (функция, а не класс)
+# REQUEST LOGIC
 # ============================================================
 
 def _read_body(req):
@@ -1143,10 +1130,10 @@ def _text_response(text, status=200):
     return status, {"Content-Type": "text/plain; charset=utf-8"}, text.encode("utf-8")
 
 
-def handler(req):
-    """Точка входа для Vercel Python runtime: handler(request) -> (status, headers, body)."""
+def process_request(req):
+    """Returns (status, headers, body). req is the BaseHTTPRequestHandler instance."""
     try:
-        method = req.method
+        method = req.command
         headers = req.headers
 
         # --- POST: Telegram webhook ---
@@ -1163,7 +1150,7 @@ def handler(req):
                 print("Error:", repr(e))
                 try:
                     src = update.get("message") or update.get("callback_query") or {}
-                    chat_id = (src.get("chat") or {}).get("id")
+                    chat_id = (src.get("chat") or (src.get("message") or {}).get("chat") or {}).get("id")
                     user_id = (src.get("from") or {}).get("id")
                     if chat_id and user_id:
                         l, _ = get_user(user_id)
@@ -1216,3 +1203,24 @@ def handler(req):
     except Exception as e:
         print("Top-level handler error:", repr(e))
         return _json_response({"ok": False, "error": type(e).__name__}, 500)
+
+
+# ============================================================
+# VERCEL ENTRY POINT (должен быть именно класс handler)
+# ============================================================
+
+class handler(BaseHTTPRequestHandler):
+    def _run(self):
+        status, headers, body = process_request(self)
+        self.send_response(status)
+        for k, v in headers.items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        self._run()
+
+    def do_POST(self):
+        self._run()
