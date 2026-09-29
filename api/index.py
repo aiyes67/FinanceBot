@@ -41,8 +41,8 @@ T = {
             "💰 Финансовый помощник\n\n"
             "Нажми ➖ Расход или ➕ Доход, потом напиши сумму и описание, например: кофе 1500.\n"
             "Слова «вчера» и «позавчера» тоже понимаю.\n\n"
-            "📊 День / Неделя / Месяц / Год — отчёты.\n"
-            "🧾 Транзакции — список операций с удалением.\n"
+            "📅 День / 📊 Неделя / Месяц / Год — отчёты, листай ◀ ▶.\n"
+            "🧾 Транзакции — список операций, там же удаление.\n"
             "💼 Баланс — итог за всё время и очистка истории.\n"
             "🌐 Язык — сменить язык"
         ),
@@ -73,20 +73,20 @@ T = {
             ("month", False): "Текущий месяц", ("month", True): "Прошлый месяц",
             ("year", False): "Текущий год", ("year", True): "Прошлый год",
         },
-        "tx_empty": "Операций пока нет.",
+        "tx_empty": "Операций пока нет. Добавь первую кнопкой ➖ Расход или ➕ Доход.",
         "tx_title": "🧾 Транзакции",
         "tx_page": "Стр. {n}/{total}",
         "tx_deleted": "Удалено.",
         "tx_not_found": "Операция не найдена.",
-        "tx_line": "{icon} {amount} — {desc} ({date})",
         "del_btn": "🗑",
         "del_confirm": "Удалить эту операцию?",
         "del_yes": "🗑 Удалить",
         "del_no": "↩️ Отмена",
         "balance_title": "💼 Общий баланс",
-        "balance_period": "За всё время",
         "avg_expense": "Средний расход",
         "avg_income": "Средний доход",
+        "first_tx": "Первая",
+        "last_tx": "Последняя",
         "clear_btn": "🧹 Очистить историю",
         "clear_choose": "Что удалить?",
         "clear_expenses": "🧹 Только расходы",
@@ -105,7 +105,7 @@ T = {
             "💰 Finance assistant\n\n"
             "Tap ➖ Expense or ➕ Income, then type the amount and a description, e.g.: coffee 1500.\n"
             "I also understand \"yesterday\".\n\n"
-            "📊 Day / Week / Month / Year — reports.\n"
+            "📅 Day / 📊 Week / Month / Year — reports, browse with ◀ ▶.\n"
             "🧾 Transactions — list with delete.\n"
             "💼 Balance — all-time totals and history cleanup.\n"
             "🌐 Language — change language"
@@ -137,20 +137,20 @@ T = {
             ("month", False): "This month", ("month", True): "Last month",
             ("year", False): "This year", ("year", True): "Last year",
         },
-        "tx_empty": "No transactions yet.",
+        "tx_empty": "No transactions yet. Add the first one with ➖ Expense or ➕ Income.",
         "tx_title": "🧾 Transactions",
         "tx_page": "Page {n}/{total}",
         "tx_deleted": "Deleted.",
         "tx_not_found": "Transaction not found.",
-        "tx_line": "{icon} {amount} — {desc} ({date})",
         "del_btn": "🗑",
         "del_confirm": "Delete this transaction?",
         "del_yes": "🗑 Delete",
         "del_no": "↩️ Cancel",
         "balance_title": "💼 Total balance",
-        "balance_period": "All time",
         "avg_expense": "Avg expense",
         "avg_income": "Avg income",
+        "first_tx": "First",
+        "last_tx": "Last",
         "clear_btn": "🧹 Clear history",
         "clear_choose": "What to delete?",
         "clear_expenses": "🧹 Expenses only",
@@ -169,7 +169,7 @@ T = {
             "💰 Қаржылық көмекші\n\n"
             "➖ Шығыс немесе ➕ Кіріс батырмасын басып, соманы және сипаттаманы жаз, мысалы: кофе 1500.\n"
             "«Кеше» деген сөзді де түсінемін.\n\n"
-            "📊 Күн / Апта / Ай / Жыл — есептер.\n"
+            "📅 Күн / 📊 Апта / Ай / Жыл — есептер, ◀ ▶ арқылы ауыстыр.\n"
             "🧾 Транзакциялар — тізім және жою.\n"
             "💼 Баланс — жалпы қорытынды және тарихты тазалау.\n"
             "🌐 Тіл — тілді ауыстыру"
@@ -201,20 +201,20 @@ T = {
             ("month", False): "Осы ай", ("month", True): "Өткен ай",
             ("year", False): "Осы жыл", ("year", True): "Өткен жыл",
         },
-        "tx_empty": "Әзірге операция жоқ.",
+        "tx_empty": "Әзірге операция жоқ. Алғашқысын ➖ Шығыс немесе ➕ Кіріс батырмасымен қос.",
         "tx_title": "🧾 Транзакциялар",
         "tx_page": "Бет {n}/{total}",
         "tx_deleted": "Жойылды.",
         "tx_not_found": "Операция табылмады.",
-        "tx_line": "{icon} {amount} — {desc} ({date})",
         "del_btn": "🗑",
         "del_confirm": "Осы операцияны жою керек пе?",
         "del_yes": "🗑 Жою",
         "del_no": "↩️ Болдырмау",
         "balance_title": "💼 Жалпы баланс",
-        "balance_period": "Барлық уақыт",
         "avg_expense": "Орташа шығыс",
         "avg_income": "Орташа кіріс",
+        "first_tx": "Бірінші",
+        "last_tx": "Соңғы",
         "clear_btn": "🧹 Тарихты тазалау",
         "clear_choose": "Нені жою керек?",
         "clear_expenses": "🧹 Тек шығыстар",
@@ -253,9 +253,11 @@ CATEGORY_KEYS = {
 }
 
 REPORT_PERIODS = ("day", "week", "month", "year")
-
 TX_PER_PAGE = 10
 
+# ============================================================
+# KEYBOARDS
+# ============================================================
 
 def menu_markup(lang):
     return {
@@ -269,6 +271,91 @@ def cat_label(lang, key):
     if not key:
         return T[lang]["no_category"]
     return T[lang]["cats"].get(key, key)
+
+
+def category_keyboard(state, tx_id, lang):
+    buttons = [
+        {"text": T[lang]["cats"][k], "callback_data": f"cat:{tx_id}:{k}"}
+        for k in CATEGORY_KEYS[state]
+    ]
+    return {"inline_keyboard": [buttons[i:i + 3] for i in range(0, len(buttons), 3)]}
+
+
+def report_keyboard(lang, period, offset, min_off):
+    nav = []
+    if offset - 1 >= min_off:
+        s, e = period_bounds(period, offset - 1)
+        nav.append({"text": "◀ " + short_label(lang, period, s, e),
+                    "callback_data": f"rep:{period}:{offset - 1}"})
+    if offset + 1 <= 0:
+        s, e = period_bounds(period, offset + 1)
+        nav.append({"text": short_label(lang, period, s, e) + " ▶",
+                    "callback_data": f"rep:{period}:{offset + 1}"})
+
+    views = [
+        {"text": ("✅ " if p == period else "")
+                 + T[lang]["menu"][p].replace("📊 ", "").replace("📅 ", ""),
+         "callback_data": f"rep:{p}:0"}
+        for p in REPORT_PERIODS
+    ]
+    rows = []
+    if nav:
+        rows.append(nav)
+    rows.append(views[:2])
+    rows.append(views[2:])
+    return {"inline_keyboard": rows}
+
+
+def transactions_keyboard(lang, rows, page, total_pages):
+    keyboard = []
+    for tx in rows:
+        icon = "➖" if tx["type"] == "expense" else "➕"
+        d = tx["transaction_date"]
+        desc = tx["description"] or cat_label(lang, tx["category"])
+        line = f"{icon} {money(tx['amount'])} — {desc} ({d:%d.%m})"
+        keyboard.append([
+            {"text": line[:60], "callback_data": "noop"},
+            {"text": T[lang]["del_btn"], "callback_data": f"del:{tx['id']}"},
+        ])
+
+    nav = []
+    if page > 0:
+        nav.append({"text": "◀", "callback_data": f"txp:{page - 1}"})
+    nav.append({"text": T[lang]["tx_page"].format(n=page + 1, total=total_pages),
+                "callback_data": "noop"})
+    if page + 1 < total_pages:
+        nav.append({"text": "▶", "callback_data": f"txp:{page + 1}"})
+    keyboard.append(nav)
+    return {"inline_keyboard": keyboard}
+
+
+def delete_confirm_keyboard(lang, tx_id):
+    return {"inline_keyboard": [[
+        {"text": T[lang]["del_yes"], "callback_data": f"delok:{tx_id}"},
+        {"text": T[lang]["del_no"], "callback_data": "delno"},
+    ]]}
+
+
+def balance_keyboard(lang):
+    return {"inline_keyboard": [[
+        {"text": T[lang]["clear_btn"], "callback_data": "clear:menu"}
+    ]]}
+
+
+def clear_menu_keyboard(lang):
+    return {"inline_keyboard": [
+        [{"text": T[lang]["clear_expenses"], "callback_data": "clear:expense"}],
+        [{"text": T[lang]["clear_incomes"], "callback_data": "clear:income"}],
+        [{"text": T[lang]["clear_all"], "callback_data": "clear:all"}],
+        [{"text": T[lang]["clear_cancel"], "callback_data": "clear:cancel"}],
+    ]}
+
+
+def clear_confirm_keyboard(lang, mode):
+    return {"inline_keyboard": [[
+        {"text": T[lang]["clear_yes"], "callback_data": f"clearok:{mode}"},
+        {"text": T[lang]["clear_no"], "callback_data": "clear:cancel"},
+    ]]}
 
 # ============================================================
 # TELEGRAM
@@ -338,21 +425,19 @@ def set_lang(user_id, lang):
         )
 
 
-def set_state(user_id, state, payload=None):
+def set_state(user_id, state):
     with db() as cur:
         if state is None:
             cur.execute("DELETE FROM user_state WHERE user_id = %s", (user_id,))
         else:
             cur.execute(
                 """
-                INSERT INTO user_state (user_id, state, payload, updated_at)
-                VALUES (%s, %s, %s, now())
+                INSERT INTO user_state (user_id, state, updated_at)
+                VALUES (%s, %s, now())
                 ON CONFLICT (user_id) DO UPDATE
-                  SET state = EXCLUDED.state,
-                      payload = EXCLUDED.payload,
-                      updated_at = now();
+                  SET state = EXCLUDED.state, updated_at = now();
                 """,
-                (user_id, state, json.dumps(payload) if payload else None),
+                (user_id, state),
             )
 
 
@@ -429,11 +514,9 @@ def get_report(user_id, start, end):
     expense = float(totals.get("expense", {}).get("total", 0))
     income_cnt = int(totals.get("income", {}).get("cnt", 0) or 0)
     expense_cnt = int(totals.get("expense", {}).get("cnt", 0) or 0)
-    count = income_cnt + expense_cnt
-
     return {
         "income": income, "expense": expense, "balance": income - expense,
-        "count": count, "top": top,
+        "count": income_cnt + expense_cnt, "top": top,
         "income_cnt": income_cnt, "expense_cnt": expense_cnt,
     }
 
@@ -442,7 +525,7 @@ def get_balance(user_id):
     with db() as cur:
         cur.execute(
             """
-            SELECT type, COALESCE(SUM(amount),0) AS total, COUNT(*) AS cnt
+            SELECT type, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
             FROM transactions WHERE user_id = %s GROUP BY type;
             """,
             (user_id,),
@@ -470,12 +553,8 @@ def get_balance(user_id):
 def list_transactions(user_id, page=0, per_page=TX_PER_PAGE):
     offset = page * per_page
     with db() as cur:
-        cur.execute(
-            "SELECT COUNT(*) AS n FROM transactions WHERE user_id = %s",
-            (user_id,),
-        )
+        cur.execute("SELECT COUNT(*) AS n FROM transactions WHERE user_id = %s", (user_id,))
         total = cur.fetchone()["n"]
-
         cur.execute(
             """
             SELECT id, type, amount, description, category, transaction_date
@@ -489,21 +568,21 @@ def list_transactions(user_id, page=0, per_page=TX_PER_PAGE):
     return rows, total
 
 
-def get_transaction(user_id, tx_id):
+def first_transaction_date(user_id):
     with db() as cur:
         cur.execute(
-            "SELECT id, type, amount, description, transaction_date "
-            "FROM transactions WHERE id = %s AND user_id = %s",
-            (tx_id, user_id),
+            "SELECT MIN(transaction_date) AS d FROM transactions WHERE user_id = %s",
+            (user_id,),
         )
-        return cur.fetchone()
+        return cur.fetchone()["d"]
 
 # ============================================================
 # PARSING
 # ============================================================
 
 AMOUNT_RE = re.compile(
-    r"(\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(миллион\w*|million|млн|тыс\w*|мың|к|k|m)?(?=\s|$|[^\w])",
+    r"(\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*"
+    r"(миллион\w*|million|млн|тыс\w*|мың|к|k|m)?(?=\s|$|[^\w])",
     re.IGNORECASE,
 )
 
@@ -513,9 +592,14 @@ DATE_WORDS = [
     (re.compile(r"\b(?:сегодня|today|бүгін)\b", re.IGNORECASE), 0),
 ]
 
-NOISE_WORDS = re.compile(
-    r"\b(?:расход|доход|expense|income|шығыс|кіріс)\b", re.IGNORECASE
-)
+NOISE_WORDS = re.compile(r"\b(?:расход|доход|expense|income|шығыс|кіріс)\b", re.IGNORECASE)
+
+
+def _to_float(s):
+    try:
+        return float(s.replace(" ", "").replace("\u00a0", "").replace(",", "."))
+    except ValueError:
+        return None
 
 
 def parse_entry(text):
@@ -523,16 +607,10 @@ def parse_entry(text):
     if not matches:
         return None
 
-    def _val(m):
-        try:
-            return float(m.group(1).replace(" ", "").replace("\u00a0", "").replace(",", "."))
-        except ValueError:
-            return None
-
-    # отбрасываем «годы» (1900–2100), если есть альтернатива
-    cands = [m for m in matches if not (_val(m) is not None and 1900 <= _val(m) <= 2100)]
+    cands = [m for m in matches if not (_to_float(m.group(1)) is not None
+                                        and 1900 <= _to_float(m.group(1)) <= 2100)]
     m = (cands or matches)[-1]
-    amount = _val(m)
+    amount = _to_float(m.group(1))
     if amount is None:
         return None
 
@@ -624,12 +702,6 @@ def min_offset(period, first, today=None):
     return min(off, 0)
 
 
-def first_transaction_date(user_id):
-    with db() as cur:
-        cur.execute("SELECT MIN(transaction_date) AS d FROM transactions WHERE user_id = %s", (user_id,))
-        return cur.fetchone()["d"]
-
-
 def period_title(lang, period, offset, start):
     t = T[lang]
     if offset == 0:
@@ -640,9 +712,7 @@ def period_title(lang, period, offset, start):
         tag = None
 
     if period == "day":
-        if tag:
-            return f"{tag} — {start:%d.%m.%Y}"
-        return f"{start:%d.%m.%Y}"
+        return f"{tag} — {start:%d.%m.%Y}" if tag else f"{start:%d.%m.%Y}"
     if period == "week":
         return tag or EXTRA[lang]["week"]
     name = f"{MONTHS[lang][start.month - 1]} {start.year}" if period == "month" else str(start.year)
@@ -653,72 +723,4 @@ def short_label(lang, period, start, end):
     if period == "day":
         return f"{start:%d.%m}"
     if period == "week":
-        return f"{start:%d.%m}–{end:%d.%m}"
-    if period == "month":
-        return f"{MONTHS[lang][start.month - 1]} {start.year}"
-    return str(start.year)
-
-
-def format_report(lang, period, offset, start, end, rep):
-    t = T[lang]
-    if period == "day":
-        header = f"📊 {period_title(lang, period, offset, start)}"
-    else:
-        header = f"📊 {period_title(lang, period, offset, start)} ({start:%d.%m.%Y} — {end:%d.%m.%Y})"
-    lines = [
-        header,
-        "",
-        f"➕ {t['income']}: {money(rep['income'])}",
-        f"➖ {t['expense']}: {money(rep['expense'])}",
-        f"💼 {t['balance']}: {money(rep['balance'])}",
-        f"🧾 {t['count']}: {rep['count']}",
-    ]
-    if rep["top"]:
-        lines += ["", t["top"]]
-        lines += [f"• {cat_label(lang, r['category'])}: {money(r['total'])}" for r in rep["top"]]
-    return "\n".join(lines)
-
-
-def report_keyboard(lang, period, offset, min_off):
-    nav = []
-    if offset - 1 >= min_off:
-        s, e = period_bounds(period, offset - 1)
-        nav.append({"text": "◀ " + short_label(lang, period, s, e),
-                    "callback_data": f"rep:{period}:{offset - 1}"})
-    if offset + 1 <= 0:
-        s, e = period_bounds(period, offset + 1)
-        nav.append({"text": short_label(lang, period, s, e) + " ▶",
-                    "callback_data": f"rep:{period}:{offset + 1}"})
-
-    views = [
-        {"text": ("✅ " if p == period else "") + T[lang]["menu"][p].replace("📊 ", "").replace("📅 ", ""),
-         "callback_data": f"rep:{p}:0"}
-        for p in REPORT_PERIODS
-    ]
-    rows = []
-    if nav:
-        rows.append(nav)
-    rows.append(views[:2])
-    rows.append(views[2:])
-    return {"inline_keyboard": rows}
-
-
-def report_view(user_id, lang, period, offset):
-    first = first_transaction_date(user_id)
-    min_off = min_offset(period, first) if first else 0
-    if offset < min_off or offset > 0:
-        return None
-    start, end = period_bounds(period, offset)
-    rep = get_report(user_id, start, end)
-    return (format_report(lang, period, offset, start, end, rep),
-            report_keyboard(lang, period, offset, min_off))
-
-
-def send_report(chat_id, user_id, lang, period, offset=0):
-    view = report_view(user_id, lang, period, offset)
-    if view:
-        send_message(chat_id, view[0], reply_markup=view[1])
-        return
-    first = first_transaction_date(user_id)
-    extra = EXTRA[lang]
-    send_message(chat_id, extra["no_data"].format(d
+       
