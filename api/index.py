@@ -41,7 +41,7 @@ T = {
             "💰 Финансовый помощник\n\n"
             "Нажми ➖ Расход или ➕ Доход, потом напиши сумму и описание, например: кофе 1500.\n"
             "Слова «вчера» и «позавчера» тоже понимаю.\n\n"
-            "📊 Неделя / Месяц / Год — отчёты. Прошлые периоды: /lastweek /lastmonth /lastyear\n"
+            "📊 Неделя / Месяц / Год — отчёты. Кнопки ◀ ▶ под отчётом листают периоды (с первой операции).\n"
             "🌐 Язык — сменить язык"
         ),
         "menu": {
@@ -74,7 +74,7 @@ T = {
             "💰 Finance assistant\n\n"
             "Tap ➖ Expense or ➕ Income, then type the amount and a description, e.g.: coffee 1500.\n"
             "I also understand \"yesterday\".\n\n"
-            "📊 Week / Month / Year — reports. Past periods: /lastweek /lastmonth /lastyear\n"
+            "📊 Week / Month / Year — reports. Use ◀ ▶ under a report to browse periods (from your first transaction).\n"
             "🌐 Language — change language"
         ),
         "menu": {
@@ -107,7 +107,7 @@ T = {
             "💰 Қаржылық көмекші\n\n"
             "➖ Шығыс немесе ➕ Кіріс батырмасын басып, соманы және сипаттаманы жаз, мысалы: кофе 1500.\n"
             "«Кеше» деген сөзді де түсінемін.\n\n"
-            "📊 Апта / Ай / Жыл — есептер. Өткен кезеңдер: /lastweek /lastmonth /lastyear\n"
+            "📊 Апта / Ай / Жыл — есептер. Есеп астындағы ◀ ▶ батырмалары кезеңдерді ауыстырады (бірінші операциядан бастап).\n"
             "🌐 Тіл — тілді ауыстыру"
         ),
         "menu": {
@@ -357,33 +357,94 @@ def money(val):
     return text.replace(",", " ") + " ₸"
 
 
-def period_range(period, previous=False):
-    today = datetime.now(TZ).date()
+MONTHS = {
+    "ru": ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+           "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"],
+    "en": ["January", "February", "March", "April", "May", "June",
+           "July", "August", "September", "October", "November", "December"],
+    "kk": ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым",
+           "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"],
+}
+
+EXTRA = {
+    "ru": {"week": "Неделя",
+           "no_data": "Данных за этот период нет. Первая операция: {d}.",
+           "no_tx": "Операций пока нет. Добавь первую кнопкой ➖ Расход или ➕ Доход."},
+    "en": {"week": "Week",
+           "no_data": "No data for this period. First transaction: {d}.",
+           "no_tx": "No transactions yet. Add the first one with ➖ Expense or ➕ Income."},
+    "kk": {"week": "Апта",
+           "no_data": "Бұл кезеңде дерек жоқ. Бірінші операция: {d}.",
+           "no_tx": "Әзірге операция жоқ. Алғашқысын ➖ Шығыс немесе ➕ Кіріс батырмасымен қос."},
+}
+
+
+def monday_of(d):
+    return d - timedelta(days=d.weekday())
+
+
+def period_bounds(period, offset=0, today=None):
+    """Границы периода: offset 0 = текущий, -1 = прошлый, -2 = позапрошлый и т.д."""
+    today = today or datetime.now(TZ).date()
 
     if period == "week":
-        start = today - timedelta(days=today.weekday())  # понедельник
-        if previous:
-            start -= timedelta(days=7)
-            return start, start + timedelta(days=6)
-        return start, today
+        start = monday_of(today) + timedelta(days=7 * offset)
+        return start, start + timedelta(days=6)
 
     if period == "month":
-        start = today.replace(day=1)
-        if previous:
-            end = start - timedelta(days=1)
-            return end.replace(day=1), end
-        return start, today
+        y, m0 = divmod(today.year * 12 + today.month - 1 + offset, 12)
+        ny, nm0 = divmod(today.year * 12 + today.month - 1 + offset + 1, 12)
+        return date(y, m0 + 1, 1), date(ny, nm0 + 1, 1) - timedelta(days=1)
 
-    if previous:
-        y = today.year - 1
-        return date(y, 1, 1), date(y, 12, 31)
-    return date(today.year, 1, 1), today
+    year = today.year + offset
+    return date(year, 1, 1), date(year, 12, 31)
 
 
-def format_report(lang, period, previous, start, end, rep):
+def min_offset(period, first, today=None):
+    """Самый ранний период, который можно открыть: тот, где была первая операция."""
+    today = today or datetime.now(TZ).date()
+    if period == "week":
+        off = (monday_of(first) - monday_of(today)).days // 7
+    elif period == "month":
+        off = (first.year * 12 + first.month) - (today.year * 12 + today.month)
+    else:
+        off = first.year - today.year
+    return min(off, 0)
+
+
+def first_transaction_date(user_id):
+    with db() as cur:
+        cur.execute("SELECT MIN(transaction_date) AS d FROM transactions WHERE user_id = %s", (user_id,))
+        return cur.fetchone()["d"]
+
+
+def period_title(lang, period, offset, start):
+    t = T[lang]
+    if offset == 0:
+        tag = t["titles"][(period, False)]
+    elif offset == -1:
+        tag = t["titles"][(period, True)]
+    else:
+        tag = None
+
+    if period == "week":
+        return tag or EXTRA[lang]["week"]
+    name = f"{MONTHS[lang][start.month - 1]} {start.year}" if period == "month" else str(start.year)
+    return f"{tag} — {name}" if tag else name
+
+
+def short_label(lang, period, start, end):
+    if period == "week":
+        return f"{start:%d.%m}–{end:%d.%m}"
+    if period == "month":
+        return f"{MONTHS[lang][start.month - 1]} {start.year}"
+    return str(start.year)
+
+
+def format_report(lang, period, offset, start, end, rep):
     t = T[lang]
     lines = [
-        f"📊 {t['titles'][(period, previous)]} ({start:%d.%m.%Y} — {end:%d.%m.%Y})",
+        f"📊 {period_title(lang, period, offset, start)} ({start:%d.%m.%Y} — {end:%d.%m.%Y})",
         "",
         f"➕ {t['income']}: {money(rep['income'])}",
         f"➖ {t['expense']}: {money(rep['expense'])}",
@@ -396,10 +457,45 @@ def format_report(lang, period, previous, start, end, rep):
     return "\n".join(lines)
 
 
-def send_report(chat_id, user_id, lang, period, previous=False):
-    start, end = period_range(period, previous)
+def report_keyboard(lang, period, offset, min_off):
+    nav = []
+    if offset - 1 >= min_off:
+        s, e = period_bounds(period, offset - 1)
+        nav.append({"text": "◀ " + short_label(lang, period, s, e),
+                    "callback_data": f"rep:{period}:{offset - 1}"})
+    if offset + 1 <= 0:
+        s, e = period_bounds(period, offset + 1)
+        nav.append({"text": short_label(lang, period, s, e) + " ▶",
+                    "callback_data": f"rep:{period}:{offset + 1}"})
+
+    views = [
+        {"text": ("✅ " if p == period else "") + T[lang]["menu"][p].replace("📊 ", ""),
+         "callback_data": f"rep:{p}:0"}
+        for p in ("week", "month", "year")
+    ]
+    return {"inline_keyboard": ([nav] if nav else []) + [views]}
+
+
+def report_view(user_id, lang, period, offset):
+    """(текст, кнопки) или None, если период раньше первой операции / в будущем."""
+    first = first_transaction_date(user_id)
+    min_off = min_offset(period, first) if first else 0
+    if offset < min_off or offset > 0:
+        return None
+    start, end = period_bounds(period, offset)
     rep = get_report(user_id, start, end)
-    send_message(chat_id, format_report(lang, period, previous, start, end, rep))
+    return (format_report(lang, period, offset, start, end, rep),
+            report_keyboard(lang, period, offset, min_off))
+
+
+def send_report(chat_id, user_id, lang, period, offset=0):
+    view = report_view(user_id, lang, period, offset)
+    if view:
+        send_message(chat_id, view[0], reply_markup=view[1])
+        return
+    first = first_transaction_date(user_id)
+    extra = EXTRA[lang]
+    send_message(chat_id, extra["no_data"].format(d=f"{first:%d.%m.%Y}") if first else extra["no_tx"])
 
 # ============================================================
 # ACTIONS
@@ -429,7 +525,7 @@ def run_action(action, chat_id, user_id, lang):
 
     elif action in ("lastweek", "lastmonth", "lastyear"):
         set_state(user_id, None)
-        send_report(chat_id, user_id, lang, action[4:], previous=True)
+        send_report(chat_id, user_id, lang, action[4:], offset=-1)
 
 
 def category_keyboard(state, tx_id, lang):
@@ -469,6 +565,22 @@ def process_callback(cb):
         tg("answerCallbackQuery", {"callback_query_id": cb["id"], "text": "✅ " + cat_label(lang, key)})
         tg("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
                                       "reply_markup": {"inline_keyboard": []}})
+    elif data.startswith("rep:"):
+        tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        try:
+            _, period, off = data.split(":")
+            offset = int(off)
+            if period not in ("week", "month", "year"):
+                return
+        except ValueError:
+            return
+        view = report_view(user_id, lang, period, offset)
+        if view:
+            try:
+                tg("editMessageText", {"chat_id": chat_id, "message_id": message_id,
+                                       "text": view[0], "reply_markup": view[1]})
+            except urllib.error.HTTPError:
+                pass  # «message is not modified», если нажали ту же кнопку
     else:
         tg("answerCallbackQuery", {"callback_query_id": cb["id"]})
 
